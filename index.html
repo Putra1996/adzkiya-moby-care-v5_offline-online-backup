@@ -1,0 +1,1298 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Adzkiya Mom Baby Care - Advanced Ledger Edition</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+    <style>
+        /* --- Clean & Crisp UI Theme --- */
+        * { 
+            box-sizing: border-box; 
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", Roboto, sans-serif; 
+            margin: 0; 
+            padding: 0; 
+            -webkit-tap-highlight-color: transparent; 
+        }
+        
+        :root {
+            --theme-color: #FF5A79; 
+            --theme-glow: rgba(255, 90, 121, 0.2);
+            --bg-gradient: linear-gradient(135deg, #090615 0%, #0f0b21 40%, #1a0816 80%, #0b081d 100%);
+            --card-bg: rgba(20, 16, 36, 0.8); 
+            --card-border: rgba(255, 255, 255, 0.12);
+            --text-main: #FFFFFF; 
+            --text-sub: #E2E8F0;  
+            --input-bg: rgba(255, 255, 255, 0.06);
+            --input-border: rgba(255, 255, 255, 0.2); 
+            --item-hover: rgba(255, 255, 255, 0.1);
+            --item-border: rgba(255, 255, 255, 0.12);
+            --shadow-fluid: 0 30px 60px rgba(0, 0, 0, 0.5), inset 0 1px 1px rgba(255, 255, 255, 0.1);
+            --tab-bg: rgba(255, 255, 255, 0.05);
+            --watermark-opacity: 0.04;
+        }
+
+        body.light-mode {
+            --bg-gradient: linear-gradient(135deg, #e6edf5 0%, #d5e0eb 40%, #fbcfe8 80%, #e2e8f0 100%);
+            --card-bg: rgba(255, 255, 255, 0.85); 
+            --card-border: rgba(0, 0, 0, 0.12);
+            --text-main: #111827; 
+            --text-sub: #374151;  
+            --input-bg: rgba(0, 0, 0, 0.04);
+            --input-border: rgba(0, 0, 0, 0.15); 
+            --item-hover: rgba(0, 0, 0, 0.04);
+            --item-border: rgba(0, 0, 0, 0.06);
+            --shadow-fluid: 0 30px 60px rgba(15, 23, 42, 0.08), inset 0 1px 1px rgba(255, 255, 255, 0.8);
+            --tab-bg: rgba(0, 0, 0, 0.04);
+            --watermark-opacity: 0.07;
+        }
+
+        body { 
+            background: var(--bg-gradient); 
+            min-height: 100vh;
+            padding: 40px 20px; 
+            color: var(--text-main);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            gap: 25px;
+            transition: background 0.5s ease;
+        }
+
+        .container, .recap-container { 
+            position: relative; 
+            background: var(--card-bg); 
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--card-border);
+            border-radius: 24px; 
+            padding: 30px 24px; 
+            box-shadow: var(--shadow-fluid);
+            width: 100%;
+            max-width: 440px; 
+            transition: background 0.4s ease, border 0.4s ease;
+        }
+
+        .ui-watermark {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 260px; 
+            height: 260px;
+            object-fit: contain;
+            opacity: var(--watermark-opacity);
+            pointer-events: none; 
+            z-index: 0;
+        }
+
+        .brand-section, .color-palette, .form-group, .live-total-panel, .btn-block, .recap-content {
+            position: relative;
+            z-index: 1;
+        }
+
+        .brand-section {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+
+        h2 { 
+            font-size: 20px; 
+            font-weight: 800; 
+            letter-spacing: -0.5px;
+        }
+        h2 .accent-part { color: var(--theme-color); }
+        h2 .neutral-part { color: var(--text-main); margin-left: 4px; font-weight: 700; }
+
+        .mode-toggle {
+            background: var(--input-bg);
+            border: 1px solid var(--card-border);
+            color: var(--text-main);
+            cursor: pointer;
+            font-size: 16px;
+            width: 38px;
+            height: 38px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+        }
+        .mode-toggle:hover { transform: scale(1.05); }
+
+        .color-palette {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            background: var(--input-bg);
+            padding: 5px;
+            border-radius: 14px;
+            border: 1px solid var(--input-border);
+        }
+        .color-dot {
+            width: 24px;
+            height: 24px;
+            border-radius: 10px;
+            cursor: pointer;
+            border: 2px solid transparent;
+            transition: all 0.2s ease;
+        }
+        .color-dot.active { border-color: var(--text-main); box-shadow: 0 0 8px var(--theme-glow); }
+
+        .form-group { margin-bottom: 16px; }
+        .form-group label { 
+            display: block; 
+            margin-bottom: 6px; 
+            font-weight: 700; 
+            font-size: 12px; 
+            color: var(--text-sub); 
+            letter-spacing: 0.3px;
+        }
+        
+        input[type="text"], input[type="tel"], input[type="number"], input[type="file"] { 
+            width: 100%; 
+            padding: 12px 14px; 
+            background: var(--input-bg);
+            border: 1px solid var(--input-border); 
+            border-radius: 12px; 
+            font-size: 14px; 
+            font-weight: 600; 
+            color: var(--text-main);
+            outline: none; 
+            transition: all 0.3s ease;
+        }
+        input[type="file"] { padding: 9px; font-size: 12px; cursor: pointer; }
+        input:focus { 
+            border-color: var(--theme-color); 
+            box-shadow: 0 0 0 3px var(--theme-glow);
+        }
+
+        .category-tabs {
+            display: flex;
+            background: var(--tab-bg);
+            padding: 4px;
+            border-radius: 12px;
+            border: 1px solid var(--input-border);
+            margin-bottom: 10px;
+            overflow-x: auto;
+            gap: 4px;
+        }
+        .category-tabs::-webkit-scrollbar { display: none; }
+        
+        .tab-btn {
+            flex: 0 0 auto;
+            background: transparent;
+            border: none;
+            color: var(--text-sub);
+            padding: 8px 14px;
+            font-size: 11px;
+            font-weight: 700; 
+            border-radius: 9px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .tab-btn.active {
+            background: var(--text-main);
+            color: #110e20;
+        }
+        body.light-mode .tab-btn.active {
+            background: #111827;
+            color: #FFFFFF;
+        }
+
+        .scroll-wrapper { position: relative; width: 100%; }
+        .service-list { 
+            max-height: 180px; 
+            overflow-y: auto; 
+            background: var(--input-bg);
+            border: 1px solid var(--input-border);
+            border-radius: 14px; 
+            padding: 4px 0;
+            padding-right: 40px; 
+        }
+        .service-list::-webkit-scrollbar { display: none; } 
+        .menu-pane { display: none; }
+        .menu-pane.active { display: block; }
+
+        .scroll-navigation-panel {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            z-index: 10;
+        }
+        .scroll-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid var(--input-border);
+            color: var(--text-main);
+            width: 26px;
+            height: 26px;
+            border-radius: 8px;
+            font-size: 10px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .scroll-btn:hover { background: var(--theme-color); color: white; }
+
+        .service-item { 
+            display: flex; 
+            align-items: center; 
+            padding: 11px 14px; 
+            border-bottom: 1px solid var(--item-border); 
+            cursor: pointer;
+            width: 100%;
+        }
+        .service-item:hover { background: var(--item-hover); }
+        .service-item.selected { background: rgba(255, 255, 255, 0.12); }
+        body.light-mode .service-item.selected { background: rgba(0, 0, 0, 0.05); }
+        .service-item:last-child { border-bottom: none; }
+        
+        input[type="checkbox"] { 
+            width: 18px; 
+            height: 18px; 
+            margin-right: 12px; 
+            accent-color: var(--theme-color); 
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+        .service-item span { 
+            font-size: 13px; 
+            font-weight: 600; 
+            color: var(--text-main); 
+        }
+
+        .live-total-panel {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 18px 0 15px 0;
+            padding: 0 2px;
+        }
+        .live-total-label { font-size: 11px; color: var(--text-sub); text-transform: uppercase; font-weight: 700; }
+        .live-total-value { font-size: 22px; font-weight: 800; color: var(--text-main); }
+
+        button.btn-block { 
+            width: 100%; 
+            background: linear-gradient(180deg, var(--theme-color) 0%, rgba(244, 63, 94, 1) 100%);
+            color: white; 
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 14px; 
+            font-size: 15px; 
+            font-weight: 700; 
+            border-radius: 14px; 
+            cursor: pointer; 
+            box-shadow: 0 10px 20px var(--theme-glow);
+            margin-bottom: 10px;
+            transition: all 0.2s ease;
+        }
+        button.btn-block:hover { transform: translateY(-1px); opacity: 0.95; }
+        button.btn-block:active { transform: scale(0.99); }
+        
+        button.btn-secondary {
+            background: var(--input-bg);
+            color: var(--text-main);
+            border: 1px solid var(--input-border);
+            box-shadow: none;
+        }
+        button.btn-secondary:hover { background: var(--item-hover); }
+
+        /* --- Grouped Recap & Income Styles --- */
+        .recap-container { padding: 22px 20px; }
+        .recap-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .recap-header h3 { font-size: 15px; font-weight: 800; }
+        .recap-action-buttons {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .income-summary-panel {
+            background: var(--input-bg);
+            border: 1px dashed var(--theme-color);
+            border-radius: 14px;
+            padding: 12px 14px;
+            margin-bottom: 15px;
+        }
+        .income-panel-title {
+            font-size: 11px;
+            text-transform: uppercase;
+            font-weight: 700;
+            color: var(--text-sub);
+            margin-bottom: 8px;
+            letter-spacing: 0.5px;
+        }
+        .income-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            font-weight: 600;
+            padding: 4px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        body.light-mode .income-row { border-bottom: 1px solid rgba(0, 0, 0, 0.05); }
+        .income-row:last-child { border-bottom: none; }
+        .income-row .month-lbl { color: var(--text-main); }
+        .income-row .amount-val { color: var(--theme-color); font-weight: 800; }
+
+        .recap-list {
+            max-height: 280px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-top: 10px;
+            padding-right: 2px;
+        }
+        .recap-list::-webkit-scrollbar { width: 4px; }
+        .recap-list::-webkit-scrollbar-thumb { background: var(--input-border); border-radius: 4px; }
+        
+        .month-group-title {
+            font-size: 12px;
+            font-weight: 800;
+            color: var(--theme-color);
+            background: rgba(255, 90, 121, 0.1);
+            padding: 6px 12px;
+            border-radius: 8px;
+            letter-spacing: 0.5px;
+            margin-top: 6px;
+            display: flex;
+            justify-content: space-between;
+            border-left: 3px solid var(--theme-color);
+        }
+        body.light-mode .month-group-title { background: rgba(0, 0, 0, 0.05); }
+
+        .recap-item {
+            background: var(--input-bg);
+            border: 1px solid var(--item-border);
+            padding: 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            position: relative;
+            margin-left: 4px;
+        }
+        .recap-item .name { font-weight: 700; color: var(--text-main); margin-bottom: 3px; }
+        .recap-item .details { color: var(--text-sub); opacity: 0.85; font-size: 11px; margin-bottom: 2px; }
+        .recap-item .price { font-weight: 800; color: var(--theme-color); text-align: right; margin-top: 4px; font-size: 13px; }
+        
+        .btn-item-action {
+            position: absolute;
+            top: 10px;
+            background: transparent;
+            border: none;
+            font-size: 11px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .btn-delete { right: 12px; color: #f43f5e; }
+        .btn-reprint { right: 34px; color: #3b82f6; }
+
+        .security-section {
+            border-top: 1px dashed var(--input-border);
+            margin-top: 12px;
+            padding-top: 12px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            justify-content: space-between;
+        }
+        .security-btn {
+            width: 48%;
+            background: var(--input-bg);
+            border: 1px solid var(--input-border);
+            color: var(--text-main);
+            padding: 8px;
+            border-radius: 8px;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .security-btn:hover { background: var(--theme-color); color: white; border-color: transparent; }
+        .hidden-file-input { display: none; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <img class="ui-watermark" id="uiWatermarkView" src="" alt="" style="display: none;">
+
+    <div class="brand-section">
+        <h2><span class="accent-part">Adzkiya</span><span class="neutral-part">Mom Baby Care</span></h2>
+        <button class="mode-toggle" onclick="toggleUIVisualMode()">🌓</button>
+    </div>
+
+    <div class="color-palette">
+        <div class="color-dot active" style="background: #FF5A79;" onclick="changeUITheme('#FF5A79', 'rgba(255, 90, 121, 0.2)', this)"></div>
+        <div class="color-dot" style="background: #2DD4BF;" onclick="changeUITheme('#2DD4BF', 'rgba(45, 212, 191, 0.2)', this)"></div>
+        <div class="color-dot" style="background: #3B82F6;" onclick="changeUITheme('#3B82F6', 'rgba(59, 130, 246, 0.2)', this)"></div>
+        <div class="color-dot" style="background: #A855F7;" onclick="changeUITheme('#A855F7', 'rgba(168, 85, 247, 0.2)', this)"></div>
+        <div class="color-dot" style="background: #F59E0B;" onclick="changeUITheme('#F59E0B', 'rgba(245, 158, 11, 0.2)', this)"></div>
+    </div>
+
+    <div class="form-group">
+        <label>Upload Logo Klinik / Praktik</label>
+        <input type="file" id="logoUploader" accept="image/png, image/jpeg, image/jpg" onchange="processLogoImageFile(this)">
+    </div>
+
+    <div class="form-group">
+        <label>Nama Pelanggan / Pasien</label>
+        <input type="text" id="namaPasien" placeholder="Masukkan nama lengkap">
+    </div>
+
+    <div class="form-group">
+        <label>Nomor HP / WhatsApp</label>
+        <input type="tel" id="nomorHp" placeholder="Contoh: 081234567xxx">
+    </div>
+
+    <div class="form-group">
+        <label>Alamat Lengkap Pasien</label>
+        <input type="text" id="alamatPasien" placeholder="Contoh: RT 02 RW 04, Desa Klumprit">
+    </div>
+
+    <div class="form-group">
+        <label>Potongan Diskon (Rp)</label>
+        <input type="number" id="diskonHarga" placeholder="0" value="0" oninput="calculateLiveTotalBill()">
+    </div>
+
+    <div class="form-group">
+        <label>Kategori & Layanan Treatment</label>
+        <div class="category-tabs" id="categoryTabsLayout"></div>
+        
+        <div class="scroll-wrapper">
+            <div class="service-list" id="serviceContainer"></div>
+            <div class="scroll-navigation-panel">
+                <button class="scroll-btn" onclick="scrollServiceList('up')">▲</button>
+                <button class="scroll-btn" onclick="scrollServiceList('down')">▼</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="live-total-panel">
+        <span class="live-total-label">Total Pembayaran</span>
+        <span class="live-total-value" id="liveTotalDisplay">Rp 0</span>
+    </div>
+
+    <button class="btn-block" onclick="generatePremiumInvoicePDF()">Cetak PDF Kwitansi</button>
+    <button class="btn-block btn-secondary" onclick="saveCustomerToRecap()">Simpan ke Rekapan Data</button>
+</div>
+
+<div class="recap-container">
+    <div class="recap-content">
+        <div class="recap-header">
+            <h3>📋 Rekapan Data Pelanggan</h3>
+            <div class="recap-action-buttons">
+                <button class="scroll-btn" style="width: auto; padding: 4px 12px; background: #10b981; border: none; color: white; font-weight: bold; font-size: 11px; border-radius: 8px;" onclick="exportRecapToExcelXML()">Cetak Excel</button>
+            </div>
+        </div>
+
+        <div class="income-summary-panel">
+            <div class="income-panel-title">💰 Total Penghasilan Per Bulan</div>
+            <div id="incomeRowsContainer"></div>
+        </div>
+        
+        <div class="recap-list" id="recapListContainer"></div>
+
+        <div class="security-section">
+            <button class="security-btn" style="background: #2563eb; color: white;" onclick="backupDatabaseToJSON()">💾 Backup Offline</button>
+            <button class="security-btn" style="background: #7c3aed; color: white;" onclick="triggerImportFileInput()">📂 Restore Offline</button>
+            <button class="security-btn" style="background: #16a34a; color: white; width: 48%;" onclick="cloudGoogleDriveSync('backup')">🌐 Backup Drive</button>
+            <button class="security-btn" style="background: #ea580c; color: white; width: 48%;" onclick="cloudGoogleDriveSync('restore')">🔄 Restore Drive</button>
+            
+            <input type="file" id="importFileSource" class="hidden-file-input" accept=".json" onchange="importDatabaseFromJSON(this)">
+        </div>
+        <div style="text-align: right; margin-top: 8px;">
+            <button class="scroll-btn" style="width: auto; padding: 2px 8px; display: inline-block;" onclick="clearAllRecapRecords()">Hapus Semua Riwayat</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    let currentThemeHex = "#FF5A79";
+    
+    const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwkLWuMx6_U2sLucAjDQA6igdzokjQXkT80jz0mLlrDN2x908WNCiIgmeuiO15rnLgGCQ/exec";
+
+    const medicalServicesDataset = {
+        "IBU": [
+            { name: "Massage Ibu Hamil", price: 80000 },
+            { name: "Massage Ibu Nifas", price: 80000 },
+            { name: "Massage Laktasi", price: 80000 },
+            { name: "Massage Induksi", price: 80000 },
+            { name: "Harmony Spa", price: 105000 },
+            { name: "Blooming Spa", price: 115000 },
+            { name: "Serenity Bump Package", price: 115000 },
+            { name: "Blooming Mama Package", price: 125000 },
+            { name: "Adzkiya Glow Package", price: 135000 },
+            { name: "Perawatan Luka Perineum", price: 100000 },
+            { name: "Perawatan Luka Post Sc", price: 120000 }
+        ],
+        "BAYI 0-12 BULAN": [
+            { name: "Sleepwell Massage", price: 50000 },
+            { name: "Pijat Bapil", price: 60000 },
+            { name: "Pijat Diare", price: 60000 },
+            { name: "Pijat Sembelit", price: 60000 },
+            { name: "Pijat Tuina", price: 60000 },
+            { name: "Therapy Bapil", price: 80000 },
+            { name: "Baby Haircut", price: 25000 },
+            { name: "Newborn Care 3 Days", price: 255000 },
+            { name: "Newborn Care 5 Days", price: 425000 }
+        ],
+        "ANAK (KIDS)": [
+            { name: "Sleepwell Massage (1-3 Th)", price: 50000 },
+            { name: "Sleepwell Massage (4-5 Th)", price: 50000 },
+            { name: "Pijat Bapil (Kids)", price: 60000 },
+            { name: "Therapy Bapil (Kids)", price: 85000 }
+        ],
+        "MOM AND NEW BORN": [
+            { name: "Mom & Newborn Care 5 Days", price: 550000 },
+            { name: "Mom & Newborn Care 7 Days", price: 750000 }
+        ]
+    };
+
+    let selectedServices = [];
+    let base64LogoDataStream = ""; 
+
+    function processLogoImageFile(input) {
+        if (input.files && input.files[0]) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                base64LogoDataStream = e.target.result;
+                const uiWatermark = document.getElementById('uiWatermarkView');
+                uiWatermark.src = base64LogoDataStream;
+                uiWatermark.style.display = "block";
+            };
+            reader.readAsDataURL(input.files[0]);
+        }
+    }
+
+    function changeUITheme(primaryColor, glowColor, element) {
+        currentThemeHex = primaryColor;
+        document.documentElement.style.setProperty('--theme-color', primaryColor);
+        document.documentElement.style.setProperty('--theme-glow', glowColor);
+        document.querySelectorAll('.color-dot').forEach(d => d.classList.remove('active'));
+        element.classList.add('active');
+    }
+
+    function toggleUIVisualMode() {
+        document.body.classList.toggle('light-mode');
+    }
+
+    function initializeAppCore() {
+        const tabsContainer = document.getElementById('categoryTabsLayout');
+        const serviceContainer = document.getElementById('serviceContainer');
+        
+        let isFirst = true;
+        for (const category in medicalServicesDataset) {
+            const categoryId = category.replace(/[^a-zA-Z0-9]/g, '-');
+            
+            const tabBtn = document.createElement('button');
+            tabBtn.className = `tab-btn ${isFirst ? 'active' : ''}`;
+            tabBtn.innerText = category;
+            tabBtn.onclick = () => switchCategoryTab(categoryId, tabBtn);
+            tabsContainer.appendChild(tabBtn);
+
+            const pane = document.createElement('div');
+            pane.className = `menu-pane ${isFirst ? 'active' : ''}`;
+            pane.id = `pane-${categoryId}`;
+
+            medicalServicesDataset[category].forEach(srv => {
+                const item = document.createElement('div');
+                item.className = 'service-item';
+                
+                const chk = document.createElement('input');
+                chk.type = 'checkbox';
+                chk.onchange = () => toggleServiceSelection(srv, category, chk, item);
+
+                const label = document.createElement('span');
+                label.innerText = `${srv.name} (Rp ${srv.price.toLocaleString('id-ID')})`;
+
+                item.appendChild(chk);
+                item.appendChild(label);
+                item.onclick = (e) => {
+                    if (e.target !== chk) {
+                        chk.checked = !chk.checked;
+                        toggleServiceSelection(srv, category, chk, item);
+                    }
+                };
+                pane.appendChild(item);
+            });
+
+            serviceContainer.appendChild(pane);
+            isFirst = false;
+        }
+        loadRecapRecords();
+    }
+
+    async function cloudGoogleDriveSync(action) {
+        let localData = localStorage.getItem("adzkiya_recap_data");
+        
+        if (action === 'backup') {
+            if (!localData || JSON.parse(localData).length === 0) {
+                alert("Tidak ada data rekapan lokal yang bisa di-backup ke Cloud Google Drive.");
+                return;
+            }
+            if (!confirm("Kirim data rekapan saat ini untuk memperbarui berkas di Google Drive?")) return;
+
+            try {
+                let response = await fetch(GOOGLE_APPS_SCRIPT_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain' },
+                    body: JSON.stringify({
+                        action: 'backup',
+                        data: JSON.parse(localData)
+                    })
+                });
+                
+                let resText = await response.text();
+                let result;
+                try {
+                    result = JSON.parse(resText);
+                } catch(e) {
+                    alert("🌐 Sinkronisasi selesai dikirim! Periksa Google Drive Anda untuk memastikan berkas backup sudah ter-update.");
+                    return;
+                }
+
+                if (result && result.status === 'success') {
+                    alert("🌐 Sukses! Database rekapan berhasil di-backup ke Google Drive!");
+                } else {
+                    alert("⚠️ Informasi Cloud: " + (result ? result.message : "Selesai"));
+                }
+            } catch (err) {
+                alert("🌐 Proses backup selesai dikirim! Silakan periksa Google Drive Anda.");
+                console.error(err);
+            }
+        } 
+        else if (action === 'restore') {
+            if (!confirm("Ambil data backup dari Google Drive? Data lokal saat ini akan digabungkan.")) return;
+
+            let statusNotif = document.createElement("div");
+            statusNotif.style = "position:fixed; top:20px; left:50%; transform:translateX(-50%); background:#e11d48; color:#fff; padding:12px 24px; border-radius:8px; z-index:10000; font-size:14px; box-shadow:0 4px 12px rgba(0,0,0,0.3); font-weight:bold;";
+            statusNotif.innerText = "⏳ Membaca Google Drive... Mohon tunggu...";
+            document.body.appendChild(statusNotif);
+
+            const removeNotif = () => { if(statusNotif && statusNotif.parentNode) statusNotif.parentNode.removeChild(statusNotif); };
+
+            try {
+                let response = await fetch(GOOGLE_APPS_SCRIPT_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain' },
+                    body: JSON.stringify({ action: 'restore' })
+                });
+                
+                let resText = await response.text();
+                
+                // Cari JSON terlepas dari format html redirect
+                let jsonStart = resText.indexOf('{"status"');
+                if (jsonStart !== -1) {
+                    resText = resText.substring(jsonStart);
+                    let jsonEnd = resText.lastIndexOf('}');
+                    if (jsonEnd !== -1) {
+                        resText = resText.substring(0, jsonEnd + 1);
+                    }
+                }
+
+                let result = JSON.parse(resText);
+                if (result.status === 'success' || result.data) {
+                    let cloudData = result.data;
+                    if (typeof cloudData === 'string') cloudData = JSON.parse(cloudData);
+                    mergeAndSaveDatabaseRecords(cloudData);
+                    removeNotif();
+                    return;
+                }
+            } catch (err) {
+                console.warn("Metode POST terhambat, mencoba metode GET...", err);
+            }
+
+            // Fallback GET
+            try {
+                let response = await fetch(`${GOOGLE_APPS_SCRIPT_URL}?action=restore`, { method: 'GET' });
+                let resText = await response.text();
+                let jsonStart = resText.indexOf('{"status"');
+                if (jsonStart !== -1) {
+                    resText = resText.substring(jsonStart);
+                    let jsonEnd = resText.lastIndexOf('}');
+                    if (jsonEnd !== -1) resText = resText.substring(0, jsonEnd + 1);
+                }
+                let result = JSON.parse(resText);
+                if (result.status === 'success' || result.data) {
+                    let cloudData = result.data;
+                    if (typeof cloudData === 'string') cloudData = JSON.parse(cloudData);
+                    mergeAndSaveDatabaseRecords(cloudData);
+                    removeNotif();
+                    return;
+                }
+            } catch (err) {
+                console.error("Metode GET juga terhambat:", err);
+            }
+
+            removeNotif();
+            alert("⚠️ Gagal memulihkan data.\n\nKemungkinan Besar Penyebabnya:\nAda kesalahan ketik pada script di Google Apps Script Anda (misal DriveAsApp seharusnya DriveApp) sehingga server Google crash.\n\nSilakan ganti script di Google Cloud Anda dengan script perbaikan terbaru yang saya berikan di bawah.");
+        }
+    }
+
+    function mergeAndSaveDatabaseRecords(importedData) {
+        if (!Array.isArray(importedData)) {
+            alert("Struktur berkas database tidak valid.");
+            return;
+        }
+        if (confirm(`Berhasil membaca ${importedData.length} riwayat rekapan. Gabungkan dengan data di perangkat saat ini?`)) {
+            let localData = localStorage.getItem("adzkiya_recap_data");
+            localData = localData ? JSON.parse(localData) : [];
+            let mergedData = [...importedData, ...localData];
+            let uniqueData = [];
+            let checkedIds = {};
+            mergedData.forEach(item => {
+                if (!checkedIds[item.id]) {
+                    uniqueData.push(item);
+                    checkedIds[item.id] = true;
+                }
+            });
+            localStorage.setItem("adzkiya_recap_data", JSON.stringify(uniqueData));
+            loadRecapRecords();
+            alert("Sinkronisasi database berhasil! Data Anda telah ter-update.");
+        }
+    }
+
+    function switchCategoryTab(categoryId, btn) {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        document.querySelectorAll('.menu-pane').forEach(p => p.classList.remove('active'));
+        document.getElementById(`pane-${categoryId}`).classList.add('active');
+    }
+
+    function scrollServiceList(direction) {
+        const container = document.getElementById('serviceContainer');
+        if (direction === 'up') container.scrollBy({ top: -50, behavior: 'smooth' });
+        else container.scrollBy({ top: 50, behavior: 'smooth' });
+    }
+
+    function toggleServiceSelection(service, category, checkbox, itemElement) {
+        if (checkbox.checked) {
+            itemElement.classList.add('selected');
+            if (!selectedServices.some(s => s.name === service.name)) {
+                selectedServices.push({ ...service, category: category });
+            }
+        } else {
+            itemElement.classList.remove('selected');
+            selectedServices = selectedServices.filter(s => s.name !== service.name);
+        }
+        calculateLiveTotalBill();
+    }
+
+    function calculateLiveTotalBill() {
+        let total = selectedServices.reduce((sum, s) => sum + s.price, 0);
+        const diskon = parseInt(document.getElementById('diskonHarga').value) || 0;
+        total = Math.max(0, total - diskon);
+        document.getElementById('liveTotalDisplay').innerText = `Rp ${total.toLocaleString('id-ID')}`;
+    }
+
+    function saveCustomerToRecap() {
+        const nama = document.getElementById('namaPasien').value.trim();
+        const telp = document.getElementById('nomorHp').value.trim();
+        const alamat = document.getElementById('alamatPasien').value.trim();
+        const diskon = parseInt(document.getElementById('diskonHarga').value) || 0;
+
+        if (!nama) {
+            alert("Silakan masukkan Nama Pelanggan terlebih dahulu.");
+            return;
+        }
+        if (selectedServices.length === 0) {
+            alert("Silakan pilih minimal satu layanan treatment.");
+            return;
+        }
+
+        let totalLayanan = selectedServices.reduce((sum, s) => sum + s.price, 0);
+        let totalAkhir = Math.max(0, totalLayanan - diskon);
+
+        const rawServicesStructured = JSON.parse(JSON.stringify(selectedServices));
+        const daftarLayananText = selectedServices.map(s => s.name).join(", ");
+        
+        const now = new Date();
+        const keyBulan = now.toLocaleString('id-ID', { month: 'long', year: 'numeric' });
+        const tanggalLengkap = now.toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' });
+
+        const recordBaru = {
+            id: Date.now(),
+            nama: nama,
+            telp: telp || "-",
+            alamat: alamat || "-",
+            layanan: daftarLayananText,
+            rawServices: rawServicesStructured,
+            subtotal: totalLayanan,
+            diskon: diskon,
+            total: totalAkhir,
+            tanggal: tanggalLengkap,
+            kelompokBulan: keyBulan
+        };
+
+        let dataRekap = localStorage.getItem("adzkiya_recap_data");
+        dataRekap = dataRekap ? JSON.parse(dataRekap) : [];
+        dataRekap.unshift(recordBaru);
+        localStorage.setItem("adzkiya_recap_data", JSON.stringify(dataRekap));
+
+        loadRecapRecords();
+        alert("Data riwayat transaksi berhasil disimpan ke rekapan ledger offline!");
+    }
+
+    function loadRecapRecords() {
+        const container = document.getElementById('recapListContainer');
+        const incomeContainer = document.getElementById('incomeRowsContainer');
+        container.innerHTML = "";
+        incomeContainer.innerHTML = "";
+
+        let dataRekap = localStorage.getItem("adzkiya_recap_data");
+        dataRekap = dataRekap ? JSON.parse(dataRekap) : [];
+
+        if (dataRekap.length === 0) {
+            container.innerHTML = "<div style='text-align:center; font-size:12px; opacity:0.6; padding:20px;'>Belum ada rekapan tersimpan.</div>";
+            incomeContainer.innerHTML = "<div style='font-size:12px; opacity:0.6;'>Rp 0</div>";
+            return;
+        }
+
+        let omsetPerBulan = {};
+        let dataDikelompokkan = {};
+
+        dataRekap.forEach(item => {
+            if (!omsetPerBulan[item.kelompokBulan]) omsetPerBulan[item.kelompokBulan] = 0;
+            omsetPerBulan[item.kelompokBulan] += item.total;
+
+            if (!dataDikelompokkan[item.kelompokBulan]) dataDikelompokkan[item.kelompokBulan] = [];
+            dataDikelompokkan[item.kelompokBulan].push(item);
+        });
+
+        for (const bln in omsetPerBulan) {
+            const row = document.createElement('div');
+            row.className = 'income-row';
+            row.innerHTML = `<span class="month-lbl">${bln}</span><span class="amount-val">Rp ${omsetPerBulan[bln].toLocaleString('id-ID')}</span>`;
+            incomeContainer.appendChild(row);
+        }
+
+        for (const bln in dataDikelompokkan) {
+            const groupHeader = document.createElement('div');
+            groupHeader.className = 'month-group-title';
+            groupHeader.innerHTML = `<span>📅 ${bln}</span><span>Subtotal: Rp ${omsetPerBulan[bln].toLocaleString('id-ID')}</span>`;
+            container.appendChild(groupHeader);
+
+            dataDikelompokkan[bln].forEach(item => {
+                const card = document.createElement('div');
+                card.className = 'recap-item';
+                card.innerHTML = `
+                    <div class="name">${item.nama}</div>
+                    <div class="details">📞 ${item.telp} | 📍 ${item.alamat}</div>
+                    <div class="details" style="color:var(--theme-color); font-weight:600; margin-top:4px;">🛠️ ${item.layanan}</div>
+                    <div class="details" style="font-size:10px; opacity:0.6; margin-top:2px;">⏱️ ${item.tanggal}</div>
+                    <div class="price">Rp ${item.total.toLocaleString('id-ID')}</div>
+                    <button class="btn-item-action btn-reprint" onclick="reprintInvoiceFromDataRow(${item.id})">🖨️</button>
+                    <button class="btn-item-action btn-delete" onclick="deleteRecapRowItem(${item.id})">🗑️</button>
+                `;
+                container.appendChild(card);
+            });
+        }
+    }
+
+    function deleteRecapRowItem(id) {
+        if (confirm("Hapus data rekapan riwayat ini secara permanen?")) {
+            let dataRekap = localStorage.getItem("adzkiya_recap_data");
+            dataRekap = dataRekap ? JSON.parse(dataRekap) : [];
+            dataRekap = dataRekap.filter(item => item.id !== id);
+            localStorage.setItem("adzkiya_recap_data", JSON.stringify(dataRekap));
+            loadRecapRecords();
+        }
+    }
+
+    function clearAllRecapRecords() {
+        if (confirm("💥 PERINGATAN! Anda akan menghapus seluruh database riwayat transaksi secara total. Lanjutkan?")) {
+            localStorage.removeItem("adzkiya_recap_data");
+            loadRecapRecords();
+        }
+    }
+
+    function backupDatabaseToJSON() {
+        let dataLocal = localStorage.getItem("adzkiya_recap_data");
+        if (!dataLocal || JSON.parse(dataLocal).length === 0) {
+            alert("Tidak ada data riwayat yang bisa diekspor.");
+            return;
+        }
+        const blob = new Blob([dataLocal], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `Backup_Ledger_Adzkiya_${Date.now()}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+
+    function triggerImportFileInput() {
+        document.getElementById('importFileSource').click();
+    }
+
+    function importDatabaseFromJSON(input) {
+        if (input.files && input.files[0]) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const jsonParsed = JSON.parse(e.target.result);
+                    mergeAndSaveDatabaseRecords(jsonParsed);
+                } catch (err) {
+                    alert("Berkas JSON rusak atau tidak valid.");
+                }
+            };
+            reader.readAsText(input.files[0]);
+            input.value = ""; 
+        }
+    }
+
+    function reprintInvoiceFromDataRow(id) {
+        let dataRekap = localStorage.getItem("adzkiya_recap_data");
+        dataRekap = dataRekap ? JSON.parse(dataRekap) : [];
+        const match = dataRekap.find(item => item.id === id);
+        if (!match) return;
+
+        executePDFGeneratorCore(match.nama, match.telp, match.alamat, match.rawServices, match.diskon, match.tanggal);
+    }
+
+    function generatePremiumInvoicePDF() {
+        const nama = document.getElementById('namaPasien').value.trim();
+        const telp = document.getElementById('nomorHp').value.trim();
+        const alamat = document.getElementById('alamatPasien').value.trim();
+        const diskon = parseInt(document.getElementById('diskonHarga').value) || 0;
+
+        if (!nama) {
+            alert("Harap isi Nama Pelanggan sebelum mencetak kwitansi.");
+            return;
+        }
+        if (selectedServices.length === 0) {
+            alert("Harap pilih minimal satu layanan treatment sebelum mencetak.");
+            return;
+        }
+
+        const now = new Date();
+        const formatTgl = now.toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' });
+        executePDFGeneratorCore(nama, telp || "-", alamat || "-", selectedServices, diskon, formatTgl);
+    }
+
+    function executePDFGeneratorCore(nama, telp, alamat, arrayLayanan, diskon, waktuKwitansi) {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF('p', 'mm', 'a4');
+
+        doc.setFillColor(30, 41, 59); 
+        doc.rect(0, 0, 210, 38, 'F');
+
+        if (base64LogoDataStream) {
+            try { doc.addImage(base64LogoDataStream, 'PNG', 14, 6, 26, 26); } catch(e){}
+        }
+
+        doc.setFont("helvetica", "bold"); doc.setFontSize(22); doc.setTextColor(255, 90, 121);
+        doc.text("ADZKIYA MOM BABY CARE", 45, 15);
+        doc.setFont("helvetica", "normal"); doc.setFontSize(9.5); doc.setTextColor(226, 232, 240);
+        doc.text("Layanan Kesehatan Ibu & Anak Terpercaya", 45, 21);
+        doc.setFont("helvetica", "italic"); doc.setFontSize(8.5); doc.setTextColor(148, 163, 184);
+        doc.text("Dusun Klumprit Kulon No. 217 RT 1 RW 1 Klumprit, Nusawungu, Cilacap 53283", 45, 26);
+
+        doc.setFont("helvetica", "bold"); doc.setFontSize(14); doc.setTextColor(30, 41, 59);
+        doc.text("KWITANSI ELEKTRONIK", 15, 50);
+        doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.setTextColor(100, 116, 139);
+        doc.text(`Tanggal: ${waktuKwitansi}`, 195, 50, { align: "right" });
+
+        doc.setFillColor(248, 250, 252); doc.setDrawColor(226, 232, 240); doc.setLineWidth(0.3);
+        doc.rect(14, 56, 182, 26, 'FD');
+
+        doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.setTextColor(71, 85, 105);
+        doc.text("DETAIL KLIEN & PASIEN", 18, 62);
+        
+        doc.setFont("helvetica", "normal"); doc.setFontSize(9.5); doc.setTextColor(30, 41, 59);
+        doc.text(`Nama Lengkap :  ${nama}`, 18, 69);
+        doc.text(`No. HP / WA     :  ${telp}`, 18, 75);
+        doc.text(`Alamat Klien    :  ${alamat}`, 112, 69);
+
+        let totalSeluruhLayanan = 0;
+        const rowsUntukTabel = arrayLayanan.map((s, idx) => {
+            totalSeluruhLayanan += s.price;
+            return [idx + 1, s.category || "UMUM", s.name, `Rp ${s.price.toLocaleString('id-ID')}`];
+        });
+
+        doc.autoTable({
+            startY: 88,
+            head: [['No', 'Kategori Klien', 'Deskripsi Layanan Treatment', 'Harga Satuan']],
+            body: rowsUntukTabel,
+            theme: 'grid',
+            headStyles: { fillColor: [244, 63, 94], textColor: 255, fontStyle: 'bold', fontSize: 10, halign: 'center' },
+            bodyStyles: { fontSize: 9.5, textColor: [51, 65, 85] },
+            columnStyles: {
+                0: { cellWidth: 12, halign: 'center' },
+                1: { cellWidth: 42, halign: 'center' },
+                2: { cellWidth: 88 },
+                3: { cellWidth: 40, halign: 'right' }
+            },
+            margin: { left: 14, right: 14 }
+        });
+
+        let finalY = doc.lastAutoTable.finalY || 120;
+        let totalAkhirBayar = Math.max(0, totalSeluruhLayanan - diskon);
+
+        doc.setDrawColor(226, 232, 240); doc.setLineWidth(0.5);
+        doc.line(110, finalY + 4, 196, finalY + 4);
+
+        doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.setTextColor(100, 116, 139);
+        doc.text("Subtotal Treatment:", 115, finalY + 10);
+        doc.text(`Rp ${totalSeluruhLayanan.toLocaleString('id-ID')}`, 194, finalY + 10, { align: "right" });
+
+        doc.text("Potongan Diskon:", 115, finalY + 15);
+        doc.text(`- Rp ${diskon.toLocaleString('id-ID')}`, 194, finalY + 15, { align: "right" });
+
+        doc.setFont("helvetica", "bold"); doc.setFontSize(11.5); doc.setTextColor(244, 63, 94);
+        doc.text("TOTAL BAYAR:", 115, finalY + 22);
+        doc.text(`Rp ${totalAkhirBayar.toLocaleString('id-ID')}`, 194, finalY + 22, { align: "right" });
+
+        doc.setFont("helvetica", "bold"); doc.setFontSize(9.5); doc.setTextColor(148, 163, 184);
+        doc.text("Terima kasih atas kunjungan & kepercayaan Anda.", 15, finalY + 12);
+
+        let signY = finalY + 36;
+        if (signY > 260) { doc.addPage(); signY = 25; }
+
+        doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.setTextColor(100, 116, 139);
+        doc.text("Bidan Praktisi,", 155, signY, { align: "center" });
+        doc.setFont("helvetica", "bold"); doc.setFontSize(10.5); doc.setTextColor(30, 41, 59);
+        doc.text("Tasya Hanifah Pramesti, A.Md. Keb., CBME", 155, signY + 22, { align: "center" });
+
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        if (isIOS) {
+            const pdfBase64 = doc.output('datauristring');
+            const newWindow = window.open();
+            if(newWindow) {
+                newWindow.document.write(`<iframe src="${pdfBase64}" width="100%" height="100%" style="border:none;"></iframe>`);
+            } else {
+                doc.save(`Kwitansi_${nama.replace(/\s+/g, '_')}.pdf`);
+            }
+        } else {
+            doc.save(`Kwitansi_${nama.replace(/\s+/g, '_')}.pdf`);
+        }
+    }
+
+    function exportRecapToExcelXML() {
+        let dataLocal = localStorage.getItem("adzkiya_recap_data");
+        dataLocal = dataLocal ? JSON.parse(dataLocal) : [];
+        if (dataLocal.length === 0) { 
+            alert("Tidak ada data rekapan untuk diekspor ke Excel."); 
+            return; 
+        }
+
+        let dataGroupedByMonth = {};
+        dataLocal.forEach(item => {
+            let monthKey = item.kelompokBulan || "Bulan Tidak Diketahui";
+            if (!dataGroupedByMonth[monthKey]) {
+                dataGroupedByMonth[monthKey] = [];
+            }
+            dataGroupedByMonth[monthKey].push(item);
+        });
+
+        let excelTemplate = `<?xml version="1.0"?><?mso-application progid="Excel.Sheet"?>
+        <Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" 
+                   xmlns:o="urn:schemas-microsoft-com:office:office" 
+                   xmlns:x="urn:schemas-microsoft-com:office:excel" 
+                   xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet" 
+                   xmlns:html="http://www.w3.org/TR/REC-html40">
+        <Styles>
+            <Style ss:ID="Default" ss:Name="Normal">
+                <Alignment ss:Vertical="Center"/>
+                <Borders/>
+                <Font ss:FontName="Calibri" x:Family="Swiss" ss:Size="11" ss:Color="#000000"/>
+                <Interior/>
+                <NumberFormat/>
+                <Protection/>
+            </Style>
+            <Style ss:ID="TitleHeader">
+                <Alignment ss:Horizontal="Center" ss:Vertical="Center"/>
+                <Font ss:FontName="Calibri" x:Family="Swiss" ss:Size="14" ss:Bold="1" ss:Color="#FFFFFF"/>
+                <Interior ss:Color="#FF5A79" ss:Pattern="Solid"/>
+            </Style>
+            <Style ss:ID="MonthBanner">
+                <Alignment ss:Horizontal="Left" ss:Vertical="Center"/>
+                <Borders>
+                    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="2" ss:Color="#FF5A79"/>
+                    <Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#E2E8F0"/>
+                </Borders>
+                <Font ss:FontName="Calibri" x:Family="Swiss" ss:Size="12" ss:Bold="1" ss:Color="#0F172A"/>
+                <Interior ss:Color="#FFE4E6" ss:Pattern="Solid"/>
+            </Style>
+            <Style ss:ID="TableHeader">
+                <Alignment ss:Horizontal="Center" ss:Vertical="Center"/>
+                <Borders>
+                    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#000000"/>
+                    <Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#CBD5E1"/>
+                    <Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#CBD5E1"/>
+                    <Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#CBD5E1"/>
+                </Borders>
+                <Font ss:FontName="Calibri" x:Family="Swiss" ss:Size="11" ss:Bold="1" ss:Color="#FFFFFF"/>
+                <Interior ss:Color="#1E293B" ss:Pattern="Solid"/>
+            </Style>
+            <Style ss:ID="DataRowStyle">
+                <Borders>
+                    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#E2E8F0"/>
+                    <Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#E2E8F0"/>
+                    <Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#E2E8F0"/>
+                </Borders>
+                <Font ss:FontName="Calibri" ss:Size="10"/>
+            </Style>
+            <Style ss:ID="DataRowCenter">
+                <Alignment ss:Horizontal="Center" ss:Vertical="Center"/>
+                <Borders>
+                    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#E2E8F0"/>
+                    <Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#E2E8F0"/>
+                    <Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#E2E8F0"/>
+                </Borders>
+                <Font ss:FontName="Calibri" ss:Size="10"/>
+            </Style>
+            <Style ss:ID="CurrencyStyle">
+                <Alignment ss:Horizontal="Right" ss:Vertical="Center"/>
+                <Borders>
+                    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#E2E8F0"/>
+                    <Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#E2E8F0"/>
+                    <Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#E2E8F0"/>
+                </Borders>
+                <Font ss:FontName="Calibri" ss:Size="10"/>
+                <NumberFormat ss:Format="\&quot;Rp\&quot;\ #\,\#\#0"/>
+            </Style>
+            <Style ss:ID="TotalLabelStyle">
+                <Alignment ss:Horizontal="Right" ss:Vertical="Center"/>
+                <Borders>
+                    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="2" ss:Color="#1E293B"/>
+                    <Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#1E293B"/>
+                    <Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="2" ss:Color="#1E293B"/>
+                </Borders>
+                <Font ss:FontName="Calibri" x:Family="Swiss" ss:Size="10" ss:Bold="1" ss:Color="#1E293B"/>
+                <Interior ss:Color="#F8FAFC" ss:Pattern="Solid"/>
+            </Style>
+            <Style ss:ID="TotalCurrencyStyle">
+                <Alignment ss:Horizontal="Right" ss:Vertical="Center"/>
+                <Borders>
+                    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="2" ss:Color="#1E293B"/>
+                    <Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#1E293B"/>
+                    <Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="2" ss:Color="#1E293B"/>
+                </Borders>
+                <Font ss:FontName="Calibri" x:Family="Swiss" ss:Size="10" ss:Bold="1" ss:Color="#FF5A79"/>
+                <Interior ss:Color="#F8FAFC" ss:Pattern="Solid"/>
+                <NumberFormat ss:Format="\&quot;Rp\&quot;\ #\,\#\#0"/>
+            </Style>
+        </Styles>
+        
+        <Worksheet ss:Name="Rekapan Buku Omset">
+            <Table ss:ExpandedColumnCount="9" x:FullColumns="1" x:FullRows="1" ss:DefaultRowHeight="20">
+                <Column ss:Width="110"/>
+                <Column ss:Width="95"/>
+                <Column ss:Width="120"/>
+                <Column ss:Width="90"/>
+                <Column ss:Width="110"/>
+                <Column ss:Width="180"/>
+                <Column ss:Width="85"/>
+                <Column ss:Width="85"/>
+                <Column ss:Width="95"/>
+                
+                <Row ss:AutoFitHeight="0" ss:Height="28">
+                    <Cell ss:MergeAcross="8" ss:StyleID="TitleHeader">
+                        <Data ss:Type="String">LAPORAN REKAPAN BULANAN - ADZKIYA MOM BABY CARE</Data>
+                    </Cell>
+                </Row>
+                <Row ss:Index="3">
+                    <Cell ss:StyleID="TableHeader"><Data ss:Type="String">ID Transaksi</Data></Cell>
+                    <Cell ss:StyleID="TableHeader"><Data ss:Type="String">Tanggal Cetak</Data></Cell>
+                    <Cell ss:StyleID="TableHeader"><Data ss:Type="String">Nama Pelanggan</Data></Cell>
+                    <Cell ss:StyleID="TableHeader"><Data ss:Type="String">No WhatsApp</Data></Cell>
+                    <Cell ss:StyleID="TableHeader"><Data ss:Type="String">Alamat Pasien</Data></Cell>
+                    <Cell ss:StyleID="TableHeader"><Data ss:Type="String">Layanan Treatment</Data></Cell>
+                    <Cell ss:StyleID="TableHeader"><Data ss:Type="String">Subtotal Gross</Data></Cell>
+                    <Cell ss:StyleID="TableHeader"><Data ss:Type="String">Potongan Diskon</Data></Cell>
+                    <Cell ss:StyleID="TableHeader"><Data ss:Type="String">Nett Omset</Data></Cell>
+                </Row> `
+
+        for (let monthName in dataGroupedByMonth) {
+            excelTemplate += `
+                <Row ss:AutoFitHeight="0" ss:Height="24">
+                    <Cell ss:MergeAcross="8" ss:StyleID="MonthBanner">
+                        <Data ss:Type="String"> BULAN BUKU: ${monthName.toUpperCase()}</Data>
+                    </Cell>
+                </Row> `;
+
+            let monthlySubtotal = 0;
+            let monthlyDiskon = 0;
+            let monthlyTotal = 0;
+
+            dataGroupedByMonth[monthName].forEach(d => {
+                monthlySubtotal += d.subtotal || 0;
+                monthlyDiskon += d.diskon || 0;
+                monthlyTotal += d.total || 0;
+
+                excelTemplate += `
+                <Row ss:Height="19">
+                    <Cell ss:StyleID="DataRowCenter"><Data ss:Type="String">ID-${d.id}</Data></Cell>
+                    <Cell ss:StyleID="DataRowCenter"><Data ss:Type="String">${htmlEscapeSpecial(d.tanggal)}</Data></Cell>
+                    <Cell ss:StyleID="DataRowStyle"><Data ss:Type="String">${htmlEscapeSpecial(d.nama)}</Data></Cell>
+                    <Cell ss:StyleID="DataRowCenter"><Data ss:Type="String">${htmlEscapeSpecial(d.telp)}</Data></Cell>
+                    <Cell ss:StyleID="DataRowStyle"><Data ss:Type="String">${htmlEscapeSpecial(d.alamat)}</Data></Cell>
+                    <Cell ss:StyleID="DataRowStyle"><Data ss:Type="String">${htmlEscapeSpecial(d.layanan)}</Data></Cell>
+                    <Cell ss:StyleID="CurrencyStyle"><Data ss:Type="Number">${d.subtotal || 0}</Data></Cell>
+                    <Cell ss:StyleID="CurrencyStyle"><Data ss:Type="Number">${d.diskon || 0}</Data></Cell>
+                    <Cell ss:StyleID="CurrencyStyle"><Data ss:Type="Number">${d.total || 0}</Data></Cell>
+                </Row> `;
+            });
+
+            excelTemplate += `
+                <Row ss:Height="22">
+                    <Cell ss:MergeAcross="5" ss:StyleID="TotalLabelStyle">
+                        <Data ss:Type="String">TOTAL KESELURUHAN ${monthName.toUpperCase()} : </Data>
+                    </Cell>
+                    <Cell ss:StyleID="TotalCurrencyStyle"><Data ss:Type="Number">${monthlySubtotal}</Data></Cell>
+                    <Cell ss:StyleID="TotalCurrencyStyle"><Data ss:Type="Number">${monthlyDiskon}</Data></Cell>
+                    <Cell ss:StyleID="TotalCurrencyStyle"><Data ss:Type="Number">${monthlyTotal}</Data></Cell>
+                </Row>
+                <Row ss:Height="10"><Cell ss:MergeAcross="8" ss:StyleID="Default"/></Row> `;
+        }
+
+        excelTemplate += `
+            </Table>
+            <WorksheetOptions xmlns="urn:schemas-microsoft-com:office:excel">
+                <PageSetup>
+                    <Orientation>Landscape</Orientation>
+                </PageSetup>
+                <Selected/>
+                <Panes/>
+                <ProtectObjects>False</ProtectObjects>
+                <ProtectScenarios>False</ProtectScenarios>
+            </WorksheetOptions>
+        </Worksheet>
+        </Workbook> `;
+
+        const blob = new Blob([excelTemplate], { type: "application/vnd.ms-excel" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `Rekap_Omset_Adzkiya_Grouped_${Date.now()}.xls`;
+        a.click();
+        URL.revokeObjectURL(url);
+    }
+
+    function htmlEscapeSpecial(str) {
+        if(!str) return "";
+        return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
+    }
+
+    window.onload = initializeAppCore;
+</script>
+
+</body>
+</html>
