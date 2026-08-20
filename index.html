@@ -423,9 +423,59 @@
         }
         .security-btn:hover { background: var(--theme-color); color: white; border-color: transparent; }
         .hidden-file-input { display: none; }
+
+        .role-switch {
+            display: flex; gap: 6px; width: 100%; max-width: 440px;
+            background: var(--card-bg); border: 1px solid var(--card-border);
+            border-radius: 16px; padding: 6px;
+        }
+        .role-btn {
+            flex: 1; border: none; border-radius: 12px; padding: 10px;
+            font-weight: 800; font-size: 13px; cursor: pointer;
+            background: transparent; color: var(--text-sub);
+        }
+        .role-btn.active { background: var(--theme-color); color: #fff; }
+        .notif-toast {
+            position: fixed; top: 16px; left: 50%; transform: translateX(-50%);
+            z-index: 20000; background: #e11d48; color: #fff;
+            padding: 12px 18px; border-radius: 12px; font-weight: 700;
+            font-size: 13px; box-shadow: 0 8px 24px rgba(0,0,0,.35);
+            display: none; max-width: 90%;
+        }
+        .badge-dot {
+            display: inline-flex; min-width: 18px; height: 18px; padding: 0 5px;
+            border-radius: 999px; background: #ef4444; color: #fff;
+            font-size: 10px; align-items: center; justify-content: center;
+            margin-left: 6px; vertical-align: middle;
+        }
+        .slot-row { display: flex; gap: 8px; margin-bottom: 8px; align-items: center; }
+        .slot-row input { flex: 1; }
+        .mini-add {
+            background: var(--input-bg); border: 1px dashed var(--input-border);
+            color: var(--text-main); width: 100%; padding: 8px; border-radius: 10px;
+            font-size: 12px; font-weight: 700; cursor: pointer; margin-bottom: 8px;
+        }
+        .edit-banner {
+            display: none; background: rgba(59,130,246,.15); border: 1px solid #3b82f6;
+            color: var(--text-main); padding: 8px 10px; border-radius: 10px;
+            font-size: 12px; font-weight: 700; margin-bottom: 12px;
+        }
+        .btn-edit { right: 56px; color: #f59e0b; }
+        body.patient-mode .admin-only { display: none !important; }
+        body.admin-mode .patient-only { display: none !important; }
+        input[type="date"], input[type="time"] {
+            width: 100%; padding: 12px 14px; background: var(--input-bg);
+            border: 1px solid var(--input-border); border-radius: 12px;
+            font-size: 14px; font-weight: 600; color: var(--text-main); outline: none;
+        }
     </style>
 </head>
-<body>
+<body class="admin-mode">
+<div class="notif-toast" id="adminNotifToast"></div>
+<div class="role-switch">
+    <button class="role-btn active" id="btnRoleAdmin" onclick="setAppRole('admin')">🔐 Mode Admin <span class="badge-dot" id="reservasiBadge" style="display:none">0</span></button>
+    <button class="role-btn" id="btnRolePasien" onclick="setAppRole('patient')">🤱 Mode Pasien</button>
+</div>
 
 <div class="container">
     <img class="ui-watermark" id="uiWatermarkView" src="" alt="" style="display: none;">
@@ -443,7 +493,9 @@
         <div class="color-dot" style="background: #F59E0B;" onclick="changeUITheme('#F59E0B', 'rgba(245, 158, 11, 0.2)', this)"></div>
     </div>
 
-    <div class="form-group">
+    <div class="edit-banner" id="editBanner">✏️ Mengedit kwitansi — simpan untuk memperbarui rekapan. <button type="button" class="scroll-btn" style="width:auto;padding:2px 8px;display:inline-block;margin-left:6px;" onclick="cancelEditKwitansi()">Batal</button></div>
+
+    <div class="form-group admin-only">
         <label>Upload Logo Klinik / Praktik</label>
         <input type="file" id="logoUploader" accept="image/png, image/jpeg, image/jpg" onchange="processLogoImageFile(this)">
     </div>
@@ -463,9 +515,14 @@
         <input type="text" id="alamatPasien" placeholder="Contoh: RT 02 RW 04, Desa Klumprit">
     </div>
 
-    <div class="form-group">
+    <div class="form-group admin-only">
         <label>Potongan Diskon (Rp)</label>
         <input type="number" id="diskonHarga" placeholder="0" value="0" oninput="calculateLiveTotalBill()">
+    </div>
+
+    <div class="form-group admin-only">
+        <label>Biaya Transportasi (Rp)</label>
+        <input type="number" id="biayaTransport" placeholder="0" value="0" oninput="calculateLiveTotalBill()">
     </div>
 
     <div class="form-group">
@@ -481,13 +538,29 @@
         </div>
     </div>
 
-    <div class="live-total-panel">
+    <div class="form-group patient-only">
+        <label>Tanggal Reservasi (boleh tidak berurutan, tanpa batas)</label>
+        <div id="dateSlots"></div>
+        <button type="button" class="mini-add" onclick="addDateSlot()">＋ Tambah tanggal</button>
+    </div>
+    <div class="form-group patient-only">
+        <label>Jam Reservasi (boleh lebih dari 1, tanpa batas)</label>
+        <div id="timeSlots"></div>
+        <button type="button" class="mini-add" onclick="addTimeSlot()">＋ Tambah jam</button>
+    </div>
+    <div class="form-group patient-only">
+        <label>Catatan (opsional)</label>
+        <input type="text" id="catatanReservasi" placeholder="Contoh: rumah 2 lantai, parkir motor">
+    </div>
+
+    <div class="live-total-panel admin-only">
         <span class="live-total-label">Total Pembayaran</span>
         <span class="live-total-value" id="liveTotalDisplay">Rp 0</span>
     </div>
 
-    <button class="btn-block" onclick="generatePremiumInvoicePDF()">Cetak PDF Kwitansi</button>
-    <button class="btn-block btn-secondary" onclick="saveCustomerToRecap()">Simpan ke Rekapan Data</button>
+    <button class="btn-block admin-only" id="btnCetakPdf" onclick="generatePremiumInvoicePDF()">Cetak PDF Kwitansi</button>
+    <button class="btn-block btn-secondary admin-only" id="btnSimpanRekap" onclick="saveCustomerToRecap()">Simpan ke Rekapan Data</button>
+    <button class="btn-block patient-only" onclick="submitPatientReservation()">Kirim Reservasi Online</button>
 </div>
 
 <div class="recap-container">
@@ -526,6 +599,10 @@
     const LS_THEME = "adzkiya_theme";
     const LS_MODE = "adzkiya_ui_mode";
     const LS_LOGO = "adzkiya_logo";
+    const LS_RESERVASI = "adzkiya_reservations";
+    const LS_RESERVASI_SEEN = "adzkiya_reservations_seen";
+    let editingKwitansiId = null;
+    let reservationChannel = null;
     
     const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwkLWuMx6_U2sLucAjDQA6igdzokjQXkT80jz0mLlrDN2x908WNCiIgmeuiO15rnLgGCQ/exec";
 
@@ -628,6 +705,13 @@
     function initializeAppCore() {
         const tabsContainer = document.getElementById('categoryTabsLayout');
         const serviceContainer = document.getElementById('serviceContainer');
+        if (tabsContainer && tabsContainer.children.length > 0) {
+            restoreUiPreferences();
+            loadRecapRecords();
+            setupReservationRealtime();
+            renderReservasiAdmin();
+            return;
+        }
         
         let isFirst = true;
         for (const category in medicalServicesDataset) {
@@ -830,7 +914,8 @@
     function calculateLiveTotalBill() {
         let total = selectedServices.reduce((sum, s) => sum + s.price, 0);
         const diskon = parseInt(document.getElementById('diskonHarga').value) || 0;
-        total = Math.max(0, total - diskon);
+        const transport = parseInt(document.getElementById('biayaTransport').value) || 0;
+        total = Math.max(0, total + transport - diskon);
         document.getElementById('liveTotalDisplay').innerText = `Rp ${total.toLocaleString('id-ID')}`;
     }
 
@@ -839,6 +924,7 @@
         const telp = document.getElementById('nomorHp').value.trim();
         const alamat = document.getElementById('alamatPasien').value.trim();
         const diskon = parseInt(document.getElementById('diskonHarga').value) || 0;
+        const transport = parseInt(document.getElementById('biayaTransport').value) || 0;
 
         if (!nama) {
             alert("Silakan masukkan Nama Pelanggan terlebih dahulu.");
@@ -850,7 +936,7 @@
         }
 
         let totalLayanan = selectedServices.reduce((sum, s) => sum + s.price, 0);
-        let totalAkhir = Math.max(0, totalLayanan - diskon);
+        let totalAkhir = Math.max(0, totalLayanan + transport - diskon);
 
         const rawServicesStructured = JSON.parse(JSON.stringify(selectedServices));
         const daftarLayananText = selectedServices.map(s => s.name).join(", ");
@@ -868,6 +954,7 @@
             rawServices: rawServicesStructured,
             subtotal: totalLayanan,
             diskon: diskon,
+            transport: transport,
             total: totalAkhir,
             tanggal: tanggalLengkap,
             kelompokBulan: keyBulan
@@ -875,11 +962,52 @@
 
         let dataRekap = localStorage.getItem(LS_RECAP);
         dataRekap = dataRekap ? JSON.parse(dataRekap) : [];
-        dataRekap.unshift(recordBaru);
+        if (editingKwitansiId) {
+            recordBaru.id = editingKwitansiId;
+            dataRekap = dataRekap.map(r => r.id === editingKwitansiId ? { ...r, ...recordBaru, tanggal: r.tanggal, kelompokBulan: r.kelompokBulan } : r);
+            editingKwitansiId = null;
+            document.getElementById('editBanner').style.display = 'none';
+            document.getElementById('btnSimpanRekap').innerText = 'Simpan ke Rekapan Data';
+            alert("Kwitansi berhasil diperbarui.");
+        } else {
+            dataRekap.unshift(recordBaru);
+            alert("Data riwayat transaksi berhasil disimpan ke rekapan ledger offline!");
+        }
         localStorage.setItem(LS_RECAP, JSON.stringify(dataRekap));
 
         loadRecapRecords();
-        alert("Data riwayat transaksi berhasil disimpan ke rekapan ledger offline!");
+    }
+
+    function cancelEditKwitansi() {
+        editingKwitansiId = null;
+        document.getElementById('editBanner').style.display = 'none';
+        document.getElementById('btnSimpanRekap').innerText = 'Simpan ke Rekapan Data';
+    }
+
+    function editKwitansiFromDataRow(id) {
+        let dataRekap = localStorage.getItem(LS_RECAP);
+        dataRekap = dataRekap ? JSON.parse(dataRekap) : [];
+        const match = dataRekap.find(item => item.id === id);
+        if (!match) return;
+        editingKwitansiId = id;
+        document.getElementById('namaPasien').value = match.nama;
+        document.getElementById('nomorHp').value = match.telp === '-' ? '' : match.telp;
+        document.getElementById('alamatPasien').value = match.alamat === '-' ? '' : match.alamat;
+        document.getElementById('diskonHarga').value = match.diskon || 0;
+        document.getElementById('biayaTransport').value = match.transport || 0;
+        selectedServices = Array.isArray(match.rawServices) ? match.rawServices.slice() : [];
+        document.querySelectorAll('.service-item').forEach(el => {
+            const chk = el.querySelector('input[type=checkbox]');
+            const span = el.querySelector('span');
+            const names = selectedServices.map(s => s.name);
+            const hit = names.some(n => span && span.innerText.indexOf(n) === 0);
+            chk.checked = hit;
+            el.classList.toggle('selected', hit);
+        });
+        calculateLiveTotalBill();
+        document.getElementById('editBanner').style.display = 'block';
+        document.getElementById('btnSimpanRekap').innerText = 'Simpan Perubahan Kwitansi';
+        window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
     function loadRecapRecords() {
@@ -930,6 +1058,7 @@
                     <div class="details" style="color:var(--theme-color); font-weight:600; margin-top:4px;">🛠️ ${htmlEscapeSpecial(item.layanan)}</div>
                     <div class="details" style="font-size:10px; opacity:0.6; margin-top:2px;">⏱️ ${htmlEscapeSpecial(item.tanggal)}</div>
                     <div class="price">Rp ${(Number(item.total) || 0).toLocaleString('id-ID')}</div>
+                    <button class="btn-item-action btn-edit" onclick="editKwitansiFromDataRow(${item.id})">✏️</button>
                     <button class="btn-item-action btn-reprint" onclick="reprintInvoiceFromDataRow(${item.id})">🖨️</button>
                     <button class="btn-item-action btn-delete" onclick="deleteRecapRowItem(${item.id})">🗑️</button>
                 `;
@@ -1002,7 +1131,7 @@
         if (!Array.isArray(layanan) || layanan.length === 0) {
             layanan = String(match.layanan || "").split(",").map(n => ({ name: n.trim(), price: 0, category: "UMUM" })).filter(s => s.name);
         }
-        executePDFGeneratorCore(match.nama, match.telp, match.alamat, layanan, match.diskon || 0, match.tanggal);
+        executePDFGeneratorCore(match.nama, match.telp, match.alamat, layanan, match.diskon || 0, match.tanggal, match.transport || 0);
     }
 
     function generatePremiumInvoicePDF() {
@@ -1010,6 +1139,7 @@
         const telp = document.getElementById('nomorHp').value.trim();
         const alamat = document.getElementById('alamatPasien').value.trim();
         const diskon = parseInt(document.getElementById('diskonHarga').value) || 0;
+        const transport = parseInt(document.getElementById('biayaTransport').value) || 0;
 
         if (!nama) {
             alert("Harap isi Nama Pelanggan sebelum mencetak kwitansi.");
@@ -1082,7 +1212,7 @@
         });
 
         let finalY = doc.lastAutoTable.finalY || 120;
-        let totalAkhirBayar = Math.max(0, totalSeluruhLayanan - diskon);
+        let totalAkhirBayar = Math.max(0, totalSeluruhLayanan + transport - diskon);
 
         doc.setDrawColor(226, 232, 240); doc.setLineWidth(0.5);
         doc.line(110, finalY + 4, 196, finalY + 4);
@@ -1091,12 +1221,15 @@
         doc.text("Subtotal Treatment:", 115, finalY + 10);
         doc.text(`Rp ${totalSeluruhLayanan.toLocaleString('id-ID')}`, 194, finalY + 10, { align: "right" });
 
-        doc.text("Potongan Diskon:", 115, finalY + 15);
-        doc.text(`- Rp ${diskon.toLocaleString('id-ID')}`, 194, finalY + 15, { align: "right" });
+        doc.text("Biaya Transportasi:", 115, finalY + 15);
+        doc.text(`Rp ${transport.toLocaleString('id-ID')}`, 194, finalY + 15, { align: "right" });
+
+        doc.text("Potongan Diskon:", 115, finalY + 20);
+        doc.text(`- Rp ${diskon.toLocaleString('id-ID')}`, 194, finalY + 20, { align: "right" });
 
         doc.setFont("helvetica", "bold"); doc.setFontSize(11.5); doc.setTextColor(244, 63, 94);
-        doc.text("TOTAL BAYAR:", 115, finalY + 22);
-        doc.text(`Rp ${totalAkhirBayar.toLocaleString('id-ID')}`, 194, finalY + 22, { align: "right" });
+        doc.text("TOTAL BAYAR:", 115, finalY + 27);
+        doc.text(`Rp ${totalAkhirBayar.toLocaleString('id-ID')}`, 194, finalY + 27, { align: "right" });
 
         doc.setFont("helvetica", "bold"); doc.setFontSize(9.5); doc.setTextColor(148, 163, 184);
         doc.text("Terima kasih atas kunjungan & kepercayaan Anda.", 15, finalY + 12);
@@ -1335,10 +1468,6 @@
     } else {
         initializeAppCore();
     }
-</script>
-
-</body>
-</html>nitializeAppCore;
 </script>
 
 </body>
