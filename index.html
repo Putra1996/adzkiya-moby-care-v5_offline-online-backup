@@ -522,6 +522,10 @@
 
 <script>
     let currentThemeHex = "#FF5A79";
+    const LS_RECAP = "adzkiya_recap_data";
+    const LS_THEME = "adzkiya_theme";
+    const LS_MODE = "adzkiya_ui_mode";
+    const LS_LOGO = "adzkiya_logo";
     
     const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwkLWuMx6_U2sLucAjDQA6igdzokjQXkT80jz0mLlrDN2x908WNCiIgmeuiO15rnLgGCQ/exec";
 
@@ -570,6 +574,7 @@
             const reader = new FileReader();
             reader.onload = function(e) {
                 base64LogoDataStream = e.target.result;
+                try { localStorage.setItem(LS_LOGO, base64LogoDataStream); } catch (err) {}
                 const uiWatermark = document.getElementById('uiWatermarkView');
                 uiWatermark.src = base64LogoDataStream;
                 uiWatermark.style.display = "block";
@@ -583,11 +588,41 @@
         document.documentElement.style.setProperty('--theme-color', primaryColor);
         document.documentElement.style.setProperty('--theme-glow', glowColor);
         document.querySelectorAll('.color-dot').forEach(d => d.classList.remove('active'));
-        element.classList.add('active');
+        if (element) element.classList.add('active');
+        try {
+            localStorage.setItem(LS_THEME, JSON.stringify({ primaryColor, glowColor }));
+        } catch (err) {}
     }
 
     function toggleUIVisualMode() {
         document.body.classList.toggle('light-mode');
+        try {
+            localStorage.setItem(LS_MODE, document.body.classList.contains('light-mode') ? 'light' : 'dark');
+        } catch (err) {}
+    }
+
+    function restoreUiPreferences() {
+        try {
+            if (localStorage.getItem(LS_MODE) === 'light') document.body.classList.add('light-mode');
+            const savedTheme = localStorage.getItem(LS_THEME);
+            if (savedTheme) {
+                const t = JSON.parse(savedTheme);
+                const dots = document.querySelectorAll('.color-dot');
+                let match = null;
+                dots.forEach(d => {
+                    const bg = (d.getAttribute('style') || '').toUpperCase();
+                    if (t.primaryColor && bg.indexOf(t.primaryColor.toUpperCase()) !== -1) match = d;
+                });
+                changeUITheme(t.primaryColor, t.glowColor, match || dots[0]);
+            }
+            const savedLogo = localStorage.getItem(LS_LOGO);
+            if (savedLogo) {
+                base64LogoDataStream = savedLogo;
+                const uiWatermark = document.getElementById('uiWatermarkView');
+                uiWatermark.src = savedLogo;
+                uiWatermark.style.display = "block";
+            }
+        } catch (err) {}
     }
 
     function initializeAppCore() {
@@ -637,7 +672,7 @@
     }
 
     async function cloudGoogleDriveSync(action) {
-        let localData = localStorage.getItem("adzkiya_recap_data");
+        let localData = localStorage.getItem(LS_RECAP);
         
         if (action === 'backup') {
             if (!localData || JSON.parse(localData).length === 0) {
@@ -749,7 +784,7 @@
             return;
         }
         if (confirm(`Berhasil membaca ${importedData.length} riwayat rekapan. Gabungkan dengan data di perangkat saat ini?`)) {
-            let localData = localStorage.getItem("adzkiya_recap_data");
+            let localData = localStorage.getItem(LS_RECAP);
             localData = localData ? JSON.parse(localData) : [];
             let mergedData = [...importedData, ...localData];
             let uniqueData = [];
@@ -760,7 +795,7 @@
                     checkedIds[item.id] = true;
                 }
             });
-            localStorage.setItem("adzkiya_recap_data", JSON.stringify(uniqueData));
+            localStorage.setItem(LS_RECAP, JSON.stringify(uniqueData));
             loadRecapRecords();
             alert("Sinkronisasi database berhasil! Data Anda telah ter-update.");
         }
@@ -838,10 +873,10 @@
             kelompokBulan: keyBulan
         };
 
-        let dataRekap = localStorage.getItem("adzkiya_recap_data");
+        let dataRekap = localStorage.getItem(LS_RECAP);
         dataRekap = dataRekap ? JSON.parse(dataRekap) : [];
         dataRekap.unshift(recordBaru);
-        localStorage.setItem("adzkiya_recap_data", JSON.stringify(dataRekap));
+        localStorage.setItem(LS_RECAP, JSON.stringify(dataRekap));
 
         loadRecapRecords();
         alert("Data riwayat transaksi berhasil disimpan ke rekapan ledger offline!");
@@ -853,7 +888,7 @@
         container.innerHTML = "";
         incomeContainer.innerHTML = "";
 
-        let dataRekap = localStorage.getItem("adzkiya_recap_data");
+        let dataRekap = localStorage.getItem(LS_RECAP);
         dataRekap = dataRekap ? JSON.parse(dataRekap) : [];
 
         if (dataRekap.length === 0) {
@@ -876,25 +911,25 @@
         for (const bln in omsetPerBulan) {
             const row = document.createElement('div');
             row.className = 'income-row';
-            row.innerHTML = `<span class="month-lbl">${bln}</span><span class="amount-val">Rp ${omsetPerBulan[bln].toLocaleString('id-ID')}</span>`;
+            row.innerHTML = `<span class="month-lbl">${htmlEscapeSpecial(bln)}</span><span class="amount-val">Rp ${omsetPerBulan[bln].toLocaleString('id-ID')}</span>`;
             incomeContainer.appendChild(row);
         }
 
         for (const bln in dataDikelompokkan) {
             const groupHeader = document.createElement('div');
             groupHeader.className = 'month-group-title';
-            groupHeader.innerHTML = `<span>📅 ${bln}</span><span>Subtotal: Rp ${omsetPerBulan[bln].toLocaleString('id-ID')}</span>`;
+            groupHeader.innerHTML = `<span>📅 ${htmlEscapeSpecial(bln)}</span><span>Subtotal: Rp ${omsetPerBulan[bln].toLocaleString('id-ID')}</span>`;
             container.appendChild(groupHeader);
 
             dataDikelompokkan[bln].forEach(item => {
                 const card = document.createElement('div');
                 card.className = 'recap-item';
                 card.innerHTML = `
-                    <div class="name">${item.nama}</div>
-                    <div class="details">📞 ${item.telp} | 📍 ${item.alamat}</div>
-                    <div class="details" style="color:var(--theme-color); font-weight:600; margin-top:4px;">🛠️ ${item.layanan}</div>
-                    <div class="details" style="font-size:10px; opacity:0.6; margin-top:2px;">⏱️ ${item.tanggal}</div>
-                    <div class="price">Rp ${item.total.toLocaleString('id-ID')}</div>
+                    <div class="name">${htmlEscapeSpecial(item.nama)}</div>
+                    <div class="details">📞 ${htmlEscapeSpecial(item.telp)} | 📍 ${htmlEscapeSpecial(item.alamat)}</div>
+                    <div class="details" style="color:var(--theme-color); font-weight:600; margin-top:4px;">🛠️ ${htmlEscapeSpecial(item.layanan)}</div>
+                    <div class="details" style="font-size:10px; opacity:0.6; margin-top:2px;">⏱️ ${htmlEscapeSpecial(item.tanggal)}</div>
+                    <div class="price">Rp ${(Number(item.total) || 0).toLocaleString('id-ID')}</div>
                     <button class="btn-item-action btn-reprint" onclick="reprintInvoiceFromDataRow(${item.id})">🖨️</button>
                     <button class="btn-item-action btn-delete" onclick="deleteRecapRowItem(${item.id})">🗑️</button>
                 `;
@@ -905,23 +940,23 @@
 
     function deleteRecapRowItem(id) {
         if (confirm("Hapus data rekapan riwayat ini secara permanen?")) {
-            let dataRekap = localStorage.getItem("adzkiya_recap_data");
+            let dataRekap = localStorage.getItem(LS_RECAP);
             dataRekap = dataRekap ? JSON.parse(dataRekap) : [];
             dataRekap = dataRekap.filter(item => item.id !== id);
-            localStorage.setItem("adzkiya_recap_data", JSON.stringify(dataRekap));
+            localStorage.setItem(LS_RECAP, JSON.stringify(dataRekap));
             loadRecapRecords();
         }
     }
 
     function clearAllRecapRecords() {
         if (confirm("💥 PERINGATAN! Anda akan menghapus seluruh database riwayat transaksi secara total. Lanjutkan?")) {
-            localStorage.removeItem("adzkiya_recap_data");
+            localStorage.removeItem(LS_RECAP);
             loadRecapRecords();
         }
     }
 
     function backupDatabaseToJSON() {
-        let dataLocal = localStorage.getItem("adzkiya_recap_data");
+        let dataLocal = localStorage.getItem(LS_RECAP);
         if (!dataLocal || JSON.parse(dataLocal).length === 0) {
             alert("Tidak ada data riwayat yang bisa diekspor.");
             return;
@@ -958,12 +993,16 @@
     }
 
     function reprintInvoiceFromDataRow(id) {
-        let dataRekap = localStorage.getItem("adzkiya_recap_data");
+        let dataRekap = localStorage.getItem(LS_RECAP);
         dataRekap = dataRekap ? JSON.parse(dataRekap) : [];
         const match = dataRekap.find(item => item.id === id);
         if (!match) return;
 
-        executePDFGeneratorCore(match.nama, match.telp, match.alamat, match.rawServices, match.diskon, match.tanggal);
+        let layanan = match.rawServices;
+        if (!Array.isArray(layanan) || layanan.length === 0) {
+            layanan = String(match.layanan || "").split(",").map(n => ({ name: n.trim(), price: 0, category: "UMUM" })).filter(s => s.name);
+        }
+        executePDFGeneratorCore(match.nama, match.telp, match.alamat, layanan, match.diskon || 0, match.tanggal);
     }
 
     function generatePremiumInvoicePDF() {
@@ -1085,7 +1124,7 @@
     }
 
     function exportRecapToExcelXML() {
-        let dataLocal = localStorage.getItem("adzkiya_recap_data");
+        let dataLocal = localStorage.getItem(LS_RECAP);
         dataLocal = dataLocal ? JSON.parse(dataLocal) : [];
         if (dataLocal.length === 0) { 
             alert("Tidak ada data rekapan untuk diekspor ke Excel."); 
@@ -1224,7 +1263,7 @@
             excelTemplate += `
                 <Row ss:AutoFitHeight="0" ss:Height="24">
                     <Cell ss:MergeAcross="8" ss:StyleID="MonthBanner">
-                        <Data ss:Type="String"> BULAN BUKU: ${monthName.toUpperCase()}</Data>
+                        <Data ss:Type="String"> BULAN BUKU: ${htmlEscapeSpecial(monthName.toUpperCase())}</Data>
                     </Cell>
                 </Row> `;
 
@@ -1291,7 +1330,15 @@
         return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
     }
 
-    window.onload = initializeAppCore;
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", initializeAppCore);
+    } else {
+        initializeAppCore();
+    }
+</script>
+
+</body>
+</html>nitializeAppCore;
 </script>
 
 </body>
