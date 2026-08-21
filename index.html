@@ -784,6 +784,7 @@
             }
             applyAppRole('admin');
             markReservasiSeen();
+            pullReservasiCloudSilent();
             return;
         }
         applyAppRole('patient');
@@ -865,8 +866,88 @@
                 try { onReservasiUpdated(JSON.parse(e.newValue || '[]'), true); } catch (err) {}
             }
         });
-        setInterval(pullReservasiCloudSilent, 8000);
+        setInterval(pullReservasiCloudSilent, 4000);
         pullReservasiCloudSilent();
+    }
+
+    function isReservationItem(item) {
+        return !!(item && (item.type === 'reservation' || (item.dates && item.times && !item.kelompokBulan)));
+    }
+    function uniqueById(arr) {
+        const map = {};
+        (arr || []).forEach(function (i) { if (i && i.id && !map[i.id]) map[i.id] = i; });
+        return Object.keys(map).map(function (k) { return map[k]; }).sort(function (a, b) { return (b.id || 0) - (a.id || 0); });
+    }
+    function splitBundle(arr) {
+        const recap = [];
+        const reservations = [];
+        (arr || []).forEach(function (i) {
+            if (isReservationItem(i)) reservations.push(i);
+            else recap.push(i);
+        });
+        return { recap: recap, reservations: reservations };
+    }
+    function parseScriptJson(resText) {
+        if (!resText) return null;
+        let t = resText;
+        let jsonStart = t.indexOf('{"status"');
+        if (jsonStart === -1) jsonStart = t.indexOf('{');
+        if (jsonStart === -1) jsonStart = t.indexOf('[');
+        if (jsonStart === -1) return null;
+        t = t.substring(jsonStart);
+        try { return JSON.parse(t); } catch (e) {
+            const lastObj = t.lastIndexOf('}');
+            const lastArr = t.lastIndexOf(']');
+            const end = Math.max(lastObj, lastArr);
+            if (end !== -1) {
+                try { return JSON.parse(t.substring(0, end + 1)); } catch (e2) { return null; }
+            }
+            return null;
+        }
+    }
+    async function fetchCloudBundle() {
+        let parsed = null;
+        try {
+            const response = await fetch(GOOGLE_APPS_SCRIPT_URL + '?action=restore', { method: 'GET' });
+            parsed = parseScriptJson(await response.text());
+        } catch (e) {}
+        if (!parsed) {
+            try {
+                const response = await fetch(GOOGLE_APPS_SCRIPT_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain' },
+                    body: JSON.stringify({ action: 'restore' })
+                });
+                parsed = parseScriptJson(await response.text());
+            } catch (e2) {}
+        }
+        if (!parsed) return null;
+        let data = parsed.data !== undefined ? parsed.data : parsed;
+        if (typeof data === 'string') {
+            try { data = JSON.parse(data); } catch (e) { return null; }
+        }
+        if (!Array.isArray(data)) return null;
+        return splitBundle(data);
+    }
+    async function postCloudBundle(recap, reservations) {
+        const recapTagged = (recap || []).filter(function (i) { return !isReservationItem(i); });
+        const resTagged = (reservations || []).map(function (r) {
+            const copy = Object.assign({}, r);
+            copy.type = 'reservation';
+            return copy;
+        });
+        await fetch(GOOGLE_APPS_SCRIPT_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain' },
+            body: JSON.stringify({ action: 'backup', data: recapTagged.concat(resTagged) })
+        });
+        try {
+            await fetch(GOOGLE_APPS_SCRIPT_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain' },
+                body: JSON.stringify({ action: 'reservation_save', data: resTagged })
+            });
+        } catch (e) {}
     }
     function onReservasiUpdated(list, notify) {
         renderReservasiAdmin();
@@ -912,6 +993,7 @@
         if (times.length === 0) { alert('Pilih minimal satu jam (boleh lebih dari satu).'); return; }
         const rec = {
             id: Date.now(),
+            type: 'reservation',
             nama: nama, telp: telp, alamat: alamat || '-',
             layanan: selectedServices.map(function (s) { return s.name; }).join(', '),
             rawServices: JSON.parse(JSON.stringify(selectedServices)),
@@ -921,39 +1003,52 @@
         const list = getReservasiList();
         list.unshift(rec);
         setReservasiList(list);
-        pushReservasiCloud(list);
-        alert('Reservasi terkirim. Admin akan menerima notifikasi.');
+        try {
+            const ok = await pushReservasiCloud(list);
+            if (ok) alert('Reservasi terkirim ke admin. Terima kasih.');
+            else alert('Reservasi tersimpan di HP ini, tetapi gagal terkirim ke server. Cek koneksi internet lalu kirim ulang.');
+        } catch (err) {
+            alert('Gagal mengirim ke server. Pastikan internet aktif, lalu kirim ulang.');
+        }
     }
     async function pushReservasiCloud(list) {
+        const cloud = await fetchCloudBundle();
+        let recap = [];
+        try { recap = JSON.parse(localStorage.getItem(LS_RECAP) || '[]'); } catch (e) { recap = []; }
+        recap = recap.filter(function (i) { return !isReservationItem(i); });
+        if (cloud) {
+            recap = uniqueById(cloud.recap.concat(recap));
+            list = uniqueById((list || []).concat(cloud.reservations));
+        } else if (!recap.length && !(list && list.length)) {
+            return false;
+        }
         try {
-            await fetch(GOOGLE_APPS_SCRIPT_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'text/plain' },
-                body: JSON.stringify({ action: 'reservation_save', data: list })
-            });
-        } catch (err) {}
+            await postCloudBundle(recap, list);
+            setReservasiList(list);
+            return true;
+        } catch (err) {
+            return false;
+        }
     }
     async function pullReservasiCloudSilent() {
         try {
-            const response = await fetch(GOOGLE_APPS_SCRIPT_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'text/plain' },
-                body: JSON.stringify({ action: 'reservation_list' })
-            });
-            let resText = await response.text();
-            let jsonStart = resText.indexOf('{');
-            if (jsonStart === -1) return;
-            const result = JSON.parse(resText.substring(jsonStart));
-            let cloud = result.data;
-            if (typeof cloud === 'string') cloud = JSON.parse(cloud);
-            if (!Array.isArray(cloud)) return;
+            const cloud = await fetchCloudBundle();
+            if (!cloud) return;
             const local = getReservasiList();
-            const map = {};
-            cloud.concat(local).forEach(function (i) { if (i && i.id && !map[i.id]) map[i.id] = i; });
-            const merged = Object.keys(map).map(function (k) { return map[k]; }).sort(function (a, b) { return b.id - a.id; });
+            const merged = uniqueById(cloud.reservations.concat(local));
             if (JSON.stringify(merged) !== JSON.stringify(local)) {
                 localStorage.setItem(LS_RESERVASI, JSON.stringify(merged));
                 onReservasiUpdated(merged, merged.length > local.length);
+            }
+            if (cloud.recap && cloud.recap.length && document.body.classList.contains('admin-mode')) {
+                let recapLocal = [];
+                try { recapLocal = JSON.parse(localStorage.getItem(LS_RECAP) || '[]'); } catch (e) { recapLocal = []; }
+                recapLocal = recapLocal.filter(function (i) { return !isReservationItem(i); });
+                const recapMerged = uniqueById(cloud.recap.concat(recapLocal));
+                if (JSON.stringify(recapMerged) !== JSON.stringify(recapLocal)) {
+                    localStorage.setItem(LS_RECAP, JSON.stringify(recapMerged));
+                    loadRecapRecords();
+                }
             }
         } catch (err) {}
     }
@@ -1029,7 +1124,9 @@
                     headers: { 'Content-Type': 'text/plain' },
                     body: JSON.stringify({
                         action: 'backup',
-                        data: JSON.parse(localData)
+                        data: JSON.parse(localData).filter(function (i) { return !isReservationItem(i); }).concat(
+                            getReservasiList().map(function (r) { const c = Object.assign({}, r); c.type = 'reservation'; return c; })
+                        )
                     })
                 });
                 
@@ -1085,7 +1182,7 @@
                 if (result.status === 'success' || result.data) {
                     let cloudData = result.data;
                     if (typeof cloudData === 'string') cloudData = JSON.parse(cloudData);
-                    mergeAndSaveDatabaseRecords(cloudData);
+                    applyCloudRestore(cloudData);
                     removeNotif();
                     return;
                 }
@@ -1107,7 +1204,7 @@
                 if (result.status === 'success' || result.data) {
                     let cloudData = result.data;
                     if (typeof cloudData === 'string') cloudData = JSON.parse(cloudData);
-                    mergeAndSaveDatabaseRecords(cloudData);
+                    applyCloudRestore(cloudData);
                     removeNotif();
                     return;
                 }
@@ -1276,6 +1373,7 @@
 
         let dataRekap = localStorage.getItem(LS_RECAP);
         dataRekap = dataRekap ? JSON.parse(dataRekap) : [];
+        dataRekap = dataRekap.filter(function (item) { return !isReservationItem(item); });
 
         if (dataRekap.length === 0) {
             container.innerHTML = "<div style='text-align:center; font-size:12px; opacity:0.6; padding:20px;'>Belum ada rekapan tersimpan.</div>";
