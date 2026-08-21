@@ -607,6 +607,7 @@
     const LS_LOGO = "adzkiya_logo";
     const LS_RESERVASI = "adzkiya_reservations";
     const LS_RESERVASI_SEEN = "adzkiya_reservations_seen";
+    const LS_RESERVASI_DELETED = "adzkiya_reservations_deleted";
     let editingKwitansiId = null;
     let reservationChannel = null;
     
@@ -841,8 +842,23 @@
     function collectTimes() {
         return Array.from(document.querySelectorAll('#timeSlots input')).map(function (i) { return i.value; }).filter(Boolean);
     }
+    function getDeletedReservasiIds() {
+        try { return JSON.parse(localStorage.getItem(LS_RESERVASI_DELETED) || '[]'); } catch (e) { return []; }
+    }
+    function markReservasiDeleted(id) {
+        const ids = getDeletedReservasiIds();
+        if (ids.indexOf(id) === -1) ids.push(id);
+        localStorage.setItem(LS_RESERVASI_DELETED, JSON.stringify(ids));
+    }
+    function filterDeletedReservasi(list) {
+        const gone = {};
+        getDeletedReservasiIds().forEach(function (id) { gone[id] = true; });
+        return (list || []).filter(function (r) { return r && !gone[r.id]; });
+    }
     function getReservasiList() {
-        try { return JSON.parse(localStorage.getItem(LS_RESERVASI) || '[]'); } catch (e) { return []; }
+        try {
+            return filterDeletedReservasi(JSON.parse(localStorage.getItem(LS_RESERVASI) || '[]'));
+        } catch (e) { return []; }
     }
     function setReservasiList(list) {
         localStorage.setItem(LS_RESERVASI, JSON.stringify(list));
@@ -1020,16 +1036,12 @@
         }
     }
     async function pushReservasiCloud(list) {
+        list = filterDeletedReservasi(list || []);
         const cloud = await fetchCloudBundle();
         let recap = [];
         try { recap = JSON.parse(localStorage.getItem(LS_RECAP) || '[]'); } catch (e) { recap = []; }
         recap = recap.filter(function (i) { return !isReservationItem(i); });
-        if (cloud) {
-            recap = uniqueById(cloud.recap.concat(recap));
-            list = uniqueById((list || []).concat(cloud.reservations));
-        } else if (!recap.length && !(list && list.length)) {
-            return false;
-        }
+        if (cloud) recap = uniqueById(cloud.recap.concat(recap));
         try {
             await postCloudBundle(recap, list);
             setReservasiList(list);
@@ -1045,7 +1057,7 @@
             const cloud = await fetchCloudBundle();
             if (!cloud) return;
             const local = getReservasiList();
-            const merged = uniqueById(cloud.reservations.concat(local));
+            const merged = filterDeletedReservasi(uniqueById(cloud.reservations.concat(local)));
             const localIds = local.map(function (r) { return r.id; }).join(',');
             const mergedIds = merged.map(function (r) { return r.id; }).join(',');
             const hasNew = merged.length > local.length || mergedIds !== localIds;
@@ -1118,10 +1130,14 @@
     }
     function hapusReservasi(id) {
         if (!confirm('Hapus reservasi ini?')) return;
+        markReservasiDeleted(id);
         const list = getReservasiList().filter(function (r) { return r.id !== id; });
         setReservasiList(list);
-        pushReservasiCloud(list);
         renderReservasiAdmin();
+        pushReservasiCloud(list).then(function (ok) {
+            renderReservasiAdmin();
+            if (!ok) alert('Dihapus di perangkat ini. Gagal menyimpan ke server — cek internet.');
+        });
     }
 
     async function cloudGoogleDriveSync(action) {
