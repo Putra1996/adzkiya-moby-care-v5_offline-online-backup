@@ -470,11 +470,11 @@
         }
     </style>
 </head>
-<body class="admin-mode">
+<body class="patient-mode">
 <div class="notif-toast" id="adminNotifToast"></div>
 <div class="role-switch">
-    <button class="role-btn active" id="btnRoleAdmin" onclick="setAppRole('admin')">🔐 Mode Admin <span class="badge-dot" id="reservasiBadge" style="display:none">0</span></button>
-    <button class="role-btn" id="btnRolePasien" onclick="setAppRole('patient')">🤱 Mode Pasien</button>
+    <button class="role-btn" id="btnRoleAdmin" onclick="setAppRole('admin')">🔐 Mode Admin <span class="badge-dot" id="reservasiBadge" style="display:none">0</span></button>
+    <button class="role-btn active" id="btnRolePasien" onclick="setAppRole('patient')">🤱 Mode Pasien</button>
 </div>
 
 <div class="container">
@@ -482,10 +482,10 @@
 
     <div class="brand-section">
         <h2><span class="accent-part">Adzkiya</span><span class="neutral-part">Mom Baby Care</span></h2>
-        <button class="mode-toggle" onclick="toggleUIVisualMode()">🌓</button>
+        <button class="mode-toggle admin-only" onclick="toggleUIVisualMode()">🌓</button>
     </div>
 
-    <div class="color-palette">
+    <div class="color-palette admin-only">
         <div class="color-dot active" style="background: #FF5A79;" onclick="changeUITheme('#FF5A79', 'rgba(255, 90, 121, 0.2)', this)"></div>
         <div class="color-dot" style="background: #2DD4BF;" onclick="changeUITheme('#2DD4BF', 'rgba(45, 212, 191, 0.2)', this)"></div>
         <div class="color-dot" style="background: #3B82F6;" onclick="changeUITheme('#3B82F6', 'rgba(59, 130, 246, 0.2)', this)"></div>
@@ -548,10 +548,7 @@
         <div id="timeSlots"></div>
         <button type="button" class="mini-add" onclick="addTimeSlot()">＋ Tambah jam</button>
     </div>
-    <div class="form-group patient-only">
-        <label>Catatan (opsional)</label>
-        <input type="text" id="catatanReservasi" placeholder="Contoh: rumah 2 lantai, parkir motor">
-    </div>
+    <input type="hidden" id="catatanReservasi" value="">
 
     <div class="live-total-panel admin-only">
         <span class="live-total-label">Total Pembayaran</span>
@@ -563,7 +560,16 @@
     <button class="btn-block patient-only" onclick="submitPatientReservation()">Kirim Reservasi Online</button>
 </div>
 
-<div class="recap-container">
+<div class="recap-container admin-only" id="reservasiAdminBox">
+    <div class="recap-content">
+        <div class="recap-header">
+            <h3>🔔 Reservasi Masuk</h3>
+        </div>
+        <div class="recap-list" id="reservasiListContainer"></div>
+    </div>
+</div>
+
+<div class="recap-container admin-only">
     <div class="recap-content">
         <div class="recap-header">
             <h3>📋 Rekapan Data Pelanggan</h3>
@@ -752,7 +758,259 @@
             serviceContainer.appendChild(pane);
             isFirst = false;
         }
+        finishAppInit();
+    }
+
+    function finishAppInit() {
+        restoreUiPreferences();
         loadRecapRecords();
+        if (document.getElementById('dateSlots') && !document.getElementById('dateSlots').children.length) addDateSlot();
+        if (document.getElementById('timeSlots') && !document.getElementById('timeSlots').children.length) addTimeSlot();
+        setupReservationRealtime();
+        renderReservasiAdmin();
+        applyAppRole('patient', true);
+    }
+    const ADMIN_PASSWORD = "Adzkiya2025";
+    function setAppRole(role) {
+        if (role === 'admin') {
+            if (sessionStorage.getItem('adzkiya_admin_ok') !== '1') {
+                const pwd = prompt('Masukkan password admin:');
+                if (pwd !== ADMIN_PASSWORD) {
+                    alert('Password salah. Mode pasien tetap aktif.');
+                    applyAppRole('patient', true);
+                    return;
+                }
+                sessionStorage.setItem('adzkiya_admin_ok', '1');
+            }
+            applyAppRole('admin');
+            markReservasiSeen();
+            return;
+        }
+        applyAppRole('patient');
+    }
+    function applyAppRole(role, silent) {
+        document.body.classList.remove('admin-mode', 'patient-mode');
+        document.body.classList.add(role === 'admin' ? 'admin-mode' : 'patient-mode');
+        const btnA = document.getElementById('btnRoleAdmin');
+        const btnP = document.getElementById('btnRolePasien');
+        if (btnA) btnA.classList.toggle('active', role === 'admin');
+        if (btnP) btnP.classList.toggle('active', role === 'patient');
+        if (role === 'admin') renderReservasiAdmin();
+    }
+    function addDateSlot(value) {
+        const wrap = document.getElementById('dateSlots');
+        if (!wrap) return;
+        const row = document.createElement('div');
+        row.className = 'slot-row';
+        const inp = document.createElement('input');
+        inp.type = 'date';
+        if (value) inp.value = value;
+        const del = document.createElement('button');
+        del.type = 'button';
+        del.className = 'scroll-btn';
+        del.style.width = '32px';
+        del.style.height = '32px';
+        del.textContent = '✕';
+        del.onclick = function () { row.remove(); };
+        row.appendChild(inp);
+        row.appendChild(del);
+        wrap.appendChild(row);
+    }
+    function addTimeSlot(value) {
+        const wrap = document.getElementById('timeSlots');
+        if (!wrap) return;
+        const row = document.createElement('div');
+        row.className = 'slot-row';
+        const inp = document.createElement('input');
+        inp.type = 'time';
+        if (value) inp.value = value;
+        const del = document.createElement('button');
+        del.type = 'button';
+        del.className = 'scroll-btn';
+        del.style.width = '32px';
+        del.style.height = '32px';
+        del.textContent = '✕';
+        del.onclick = function () { row.remove(); };
+        row.appendChild(inp);
+        row.appendChild(del);
+        wrap.appendChild(row);
+    }
+    function collectDates() {
+        return Array.from(document.querySelectorAll('#dateSlots input')).map(function (i) { return i.value; }).filter(Boolean);
+    }
+    function collectTimes() {
+        return Array.from(document.querySelectorAll('#timeSlots input')).map(function (i) { return i.value; }).filter(Boolean);
+    }
+    function getReservasiList() {
+        try { return JSON.parse(localStorage.getItem(LS_RESERVASI) || '[]'); } catch (e) { return []; }
+    }
+    function setReservasiList(list) {
+        localStorage.setItem(LS_RESERVASI, JSON.stringify(list));
+        if (reservationChannel) {
+            try { reservationChannel.postMessage({ type: 'reservasi', list: list }); } catch (e) {}
+        }
+    }
+    function setupReservationRealtime() {
+        try {
+            reservationChannel = new BroadcastChannel('adzkiya_reservasi');
+            reservationChannel.onmessage = function (ev) {
+                if (ev.data && ev.data.list) {
+                    localStorage.setItem(LS_RESERVASI, JSON.stringify(ev.data.list));
+                    onReservasiUpdated(ev.data.list, true);
+                }
+            };
+        } catch (e) {}
+        window.addEventListener('storage', function (e) {
+            if (e.key === LS_RESERVASI) {
+                try { onReservasiUpdated(JSON.parse(e.newValue || '[]'), true); } catch (err) {}
+            }
+        });
+        setInterval(pullReservasiCloudSilent, 8000);
+        pullReservasiCloudSilent();
+    }
+    function onReservasiUpdated(list, notify) {
+        renderReservasiAdmin();
+        if (notify && document.body.classList.contains('admin-mode')) {
+            const seen = Number(localStorage.getItem(LS_RESERVASI_SEEN) || 0);
+            const unread = list.filter(function (r) { return r.id > seen && r.status !== 'selesai'; }).length;
+            if (unread > 0) showAdminNotif('🔔 ' + unread + ' reservasi baru masuk!');
+        }
+        updateReservasiBadge();
+    }
+    function showAdminNotif(text) {
+        const el = document.getElementById('adminNotifToast');
+        if (!el) return;
+        el.innerText = text;
+        el.style.display = 'block';
+        setTimeout(function () { el.style.display = 'none'; }, 6000);
+    }
+    function updateReservasiBadge() {
+        const list = getReservasiList();
+        const seen = Number(localStorage.getItem(LS_RESERVASI_SEEN) || 0);
+        const unread = list.filter(function (r) { return r.id > seen && r.status !== 'selesai'; }).length;
+        const badge = document.getElementById('reservasiBadge');
+        if (!badge) return;
+        if (unread > 0) { badge.style.display = 'inline-flex'; badge.innerText = unread; }
+        else badge.style.display = 'none';
+    }
+    function markReservasiSeen() {
+        const list = getReservasiList();
+        const maxId = list.reduce(function (m, r) { return Math.max(m, r.id || 0); }, 0);
+        localStorage.setItem(LS_RESERVASI_SEEN, String(maxId));
+        updateReservasiBadge();
+    }
+    async function submitPatientReservation() {
+        const nama = document.getElementById('namaPasien').value.trim();
+        const telp = document.getElementById('nomorHp').value.trim();
+        const alamat = document.getElementById('alamatPasien').value.trim();
+        const dates = collectDates();
+        const times = collectTimes();
+        if (!nama) { alert('Isi nama lengkap.'); return; }
+        if (!telp) { alert('Isi nomor HP / WhatsApp.'); return; }
+        if (selectedServices.length === 0) { alert('Pilih minimal satu layanan.'); return; }
+        if (dates.length === 0) { alert('Pilih minimal satu tanggal (boleh tidak berurutan).'); return; }
+        if (times.length === 0) { alert('Pilih minimal satu jam (boleh lebih dari satu).'); return; }
+        const rec = {
+            id: Date.now(),
+            nama: nama, telp: telp, alamat: alamat || '-',
+            layanan: selectedServices.map(function (s) { return s.name; }).join(', '),
+            rawServices: JSON.parse(JSON.stringify(selectedServices)),
+            dates: dates, times: times, catatan: '', status: 'baru',
+            createdAt: new Date().toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' })
+        };
+        const list = getReservasiList();
+        list.unshift(rec);
+        setReservasiList(list);
+        pushReservasiCloud(list);
+        alert('Reservasi terkirim. Admin akan menerima notifikasi.');
+    }
+    async function pushReservasiCloud(list) {
+        try {
+            await fetch(GOOGLE_APPS_SCRIPT_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain' },
+                body: JSON.stringify({ action: 'reservation_save', data: list })
+            });
+        } catch (err) {}
+    }
+    async function pullReservasiCloudSilent() {
+        try {
+            const response = await fetch(GOOGLE_APPS_SCRIPT_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain' },
+                body: JSON.stringify({ action: 'reservation_list' })
+            });
+            let resText = await response.text();
+            let jsonStart = resText.indexOf('{');
+            if (jsonStart === -1) return;
+            const result = JSON.parse(resText.substring(jsonStart));
+            let cloud = result.data;
+            if (typeof cloud === 'string') cloud = JSON.parse(cloud);
+            if (!Array.isArray(cloud)) return;
+            const local = getReservasiList();
+            const map = {};
+            cloud.concat(local).forEach(function (i) { if (i && i.id && !map[i.id]) map[i.id] = i; });
+            const merged = Object.keys(map).map(function (k) { return map[k]; }).sort(function (a, b) { return b.id - a.id; });
+            if (JSON.stringify(merged) !== JSON.stringify(local)) {
+                localStorage.setItem(LS_RESERVASI, JSON.stringify(merged));
+                onReservasiUpdated(merged, merged.length > local.length);
+            }
+        } catch (err) {}
+    }
+    function renderReservasiAdmin() {
+        const box = document.getElementById('reservasiListContainer');
+        if (!box) return;
+        const list = getReservasiList();
+        box.innerHTML = '';
+        if (!list.length) {
+            box.innerHTML = "<div style='text-align:center; font-size:12px; opacity:0.6; padding:12px;'>Belum ada reservasi.</div>";
+            updateReservasiBadge();
+            return;
+        }
+        list.forEach(function (item) {
+            const card = document.createElement('div');
+            card.className = 'recap-item';
+            card.innerHTML =
+                '<div class="name">' + htmlEscapeSpecial(item.nama) + ' <span style="font-size:10px;color:var(--theme-color)">' + htmlEscapeSpecial(item.status || 'baru') + '</span></div>' +
+                '<div class="details">📞 ' + htmlEscapeSpecial(item.telp) + ' | 📍 ' + htmlEscapeSpecial(item.alamat) + '</div>' +
+                '<div class="details">🛠️ ' + htmlEscapeSpecial(item.layanan) + '</div>' +
+                '<div class="details">📅 ' + htmlEscapeSpecial((item.dates || []).join(', ')) + '</div>' +
+                '<div class="details">⏰ ' + htmlEscapeSpecial((item.times || []).join(', ')) + '</div>' +
+                '<div class="details" style="opacity:.7">' + htmlEscapeSpecial(item.createdAt || '') + '</div>' +
+                '<button class="btn-item-action btn-reprint" onclick="terimaReservasiKeForm(' + item.id + ')">📥</button>' +
+                '<button class="btn-item-action btn-delete" onclick="hapusReservasi(' + item.id + ')">🗑️</button>';
+            box.appendChild(card);
+        });
+        updateReservasiBadge();
+    }
+    function terimaReservasiKeForm(id) {
+        const item = getReservasiList().filter(function (r) { return r.id === id; })[0];
+        if (!item) return;
+        document.getElementById('namaPasien').value = item.nama;
+        document.getElementById('nomorHp').value = item.telp;
+        document.getElementById('alamatPasien').value = item.alamat === '-' ? '' : item.alamat;
+        selectedServices = Array.isArray(item.rawServices) ? item.rawServices.slice() : [];
+        document.querySelectorAll('.service-item').forEach(function (el) {
+            const chk = el.querySelector('input[type=checkbox]');
+            const span = el.querySelector('span');
+            const names = selectedServices.map(function (s) { return s.name; });
+            const hit = names.some(function (n) { return span && span.innerText.indexOf(n) === 0; });
+            chk.checked = hit;
+            el.classList.toggle('selected', hit);
+        });
+        calculateLiveTotalBill();
+        const list = getReservasiList().map(function (r) { return r.id === id ? Object.assign({}, r, { status: 'diproses' }) : r; });
+        setReservasiList(list);
+        pushReservasiCloud(list);
+        renderReservasiAdmin();
+        alert('Data reservasi dimuat ke form kwitansi.');
+    }
+    function hapusReservasi(id) {
+        if (!confirm('Hapus reservasi ini?')) return;
+        const list = getReservasiList().filter(function (r) { return r.id !== id; });
+        setReservasiList(list);
+        pushReservasiCloud(list);
+        renderReservasiAdmin();
     }
 
     async function cloudGoogleDriveSync(action) {
@@ -1152,10 +1410,11 @@
 
         const now = new Date();
         const formatTgl = now.toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' });
-        executePDFGeneratorCore(nama, telp || "-", alamat || "-", selectedServices, diskon, formatTgl);
+        executePDFGeneratorCore(nama, telp || "-", alamat || "-", selectedServices, diskon, formatTgl, transport);
     }
 
-    function executePDFGeneratorCore(nama, telp, alamat, arrayLayanan, diskon, waktuKwitansi) {
+    function executePDFGeneratorCore(nama, telp, alamat, arrayLayanan, diskon, waktuKwitansi, transport) {
+        transport = Number(transport) || 0;
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF('p', 'mm', 'a4');
 
