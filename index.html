@@ -961,15 +961,21 @@
     }
     function flushReservationOutbox() {
         connectRealtimeSync();
-        const list = getReservasiList();
-        if (list.length) publishRealtime({ type: "snapshot", list: list });
         const box = getOutbox();
-        if (!box.length) return;
-        box.forEach(function (item) { publishRealtime(item); });
-        if (mqttClient && mqttClient.connected) {
-            localStorage.setItem(LS_OUTBOX, '[]');
+        const list = getReservasiList();
+        if (mqttClient && mqttClient.connected && list.length) {
+            try {
+                mqttClient.publish(MQTT_TOPIC_SNAP, JSON.stringify({ type: "snapshot", list: list }), { qos: 1, retain: true });
+            } catch (e) {}
         }
+        if (!box.length) return;
+        box.forEach(function (item) {
+            try {
+                if (mqttClient && mqttClient.connected) mqttClient.publish(MQTT_TOPIC, JSON.stringify(item), { qos: 1, retain: false });
+            } catch (e) {}
+        });
         pushReservasiCloud(list);
+        if (mqttClient && mqttClient.connected) localStorage.setItem(LS_OUTBOX, '[]');
     }
     function publishRealtime(obj) {
         try {
@@ -2008,6 +2014,9 @@
         initializeAppCore();
     }
 </script>
+
+</body>
+</html>
 
 </body>
 </html>
