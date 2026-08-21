@@ -6,6 +6,7 @@
     <title>Adzkiya Mom Baby Care - Advanced Ledger Edition</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.10.3/mqtt.min.js"></script>
     <style>
         /* --- Clean & Crisp UI Theme --- */
         * { 
@@ -610,6 +611,10 @@
     const LS_RESERVASI_DELETED = "adzkiya_reservations_deleted";
     let editingKwitansiId = null;
     let reservationChannel = null;
+    let mqttClient = null;
+    const MQTT_TOPIC = "adzkiya/mom-baby-care/klumprit/reservasi";
+    const MQTT_TOPIC_SNAP = "adzkiya/mom-baby-care/klumprit/reservasi/snapshot";
+    const JSONBLOB_LS = "adzkiya_jsonblob_id";
     
     const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwkLWuMx6_U2sLucAjDQA6igdzokjQXkT80jz0mLlrDN2x908WNCiIgmeuiO15rnLgGCQ/exec";
 
@@ -861,6 +866,7 @@
         } catch (e) { return []; }
     }
     function setReservasiList(list) {
+        list = filterDeletedReservasi(list || []);
         localStorage.setItem(LS_RESERVASI, JSON.stringify(list));
         if (reservationChannel) {
             try { reservationChannel.postMessage({ type: 'reservasi', list: list }); } catch (e) {}
@@ -889,7 +895,67 @@
         window.addEventListener('focus', pullReservasiCloudSilent);
         if (reservationPollTimer) clearInterval(reservationPollTimer);
         reservationPollTimer = setInterval(pullReservasiCloudSilent, 2000);
+        connectRealtimeSync();
         pullReservasiCloudSilent();
+    }
+
+    function connectRealtimeSync() {
+        if (mqttClient) return;
+        if (typeof mqtt === "undefined") return;
+        try {
+            mqttClient = mqtt.connect("wss://broker.hivemq.com:8884/mqtt", {
+                clientId: "adzkiya_" + Math.random().toString(16).slice(2),
+                clean: true,
+                reconnectPeriod: 3000,
+                connectTimeout: 8000
+            });
+            mqttClient.on("connect", function () {
+                mqttClient.subscribe(MQTT_TOPIC, { qos: 1 });
+                mqttClient.subscribe(MQTT_TOPIC_SNAP, { qos: 1 });
+            });
+            mqttClient.on("message", function (topic, payload) {
+                try {
+                    const msg = JSON.parse(payload.toString());
+                    if (msg && msg.type === "blob" && msg.id) {
+                        localStorage.setItem(JSONBLOB_LS, msg.id);
+                        return;
+                    }
+                    if (msg && msg.type === "snapshot" && Array.isArray(msg.list)) {
+                        const list = filterDeletedReservasi(uniqueById(msg.list.concat(getReservasiList())));
+                        setReservasiList(list);
+                        onReservasiUpdated(list, true);
+                        return;
+                    }
+                    if (msg && (msg.type === "reservation" || msg.dates) && msg.id) {
+                        if (getDeletedReservasiIds().indexOf(msg.id) !== -1) return;
+                        const list = uniqueById([msg].concat(getReservasiList()));
+                        setReservasiList(list);
+                        onReservasiUpdated(list, true);
+                    } else if (msg && msg.type === "deleted" && msg.id) {
+                        markReservasiDeleted(msg.id);
+                        setReservasiList(getReservasiList().filter(function (r) { return r.id !== msg.id; }));
+                        renderReservasiAdmin();
+                    }
+                } catch (e) {}
+            });
+        } catch (e) {}
+    }
+    function publishRealtime(obj) {
+        try {
+            if (mqttClient && mqttClient.connected) {
+                mqttClient.publish(MQTT_TOPIC, JSON.stringify(obj), { qos: 1, retain: false });
+                if (obj && (obj.type === "snapshot" || obj.type === "reservation" || obj.type === "deleted")) {
+                    mqttClient.publish(MQTT_TOPIC_SNAP, JSON.stringify({ type: "snapshot", list: getReservasiList() }), { qos: 1, retain: true });
+                }
+            }
+        } catch (e) {}
+    }
+    function fetchWithTimeout(url, options, ms) {
+        ms = ms || 8000;
+        const ctrl = new AbortController();
+        const t = setTimeout(function () { ctrl.abort(); }, ms);
+        const opts = Object.assign({ signal: ctrl.signal, cache: "no-store" }, options || {});
+        return fetch(url, opts).finally(function () { clearTimeout(t); });
     }
 
     function isReservationItem(item) {
@@ -960,17 +1026,60 @@
             copy.type = 'reservation';
             return copy;
         });
-        await fetch(GOOGLE_APPS_SCRIPT_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'text/plain' },
-            body: JSON.stringify({ action: 'backup', data: recapTagged.concat(resTagged) })
-        });
+        const bundle = recapTagged.concat(resTagged);
         try {
-            await fetch(GOOGLE_APPS_SCRIPT_URL, {
+            await fetchWithTimeout(GOOGLE_APPS_SCRIPT_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain' },
+                body: JSON.stringify({ action: 'backup', data: bundle })
+            }, 10000);
+        } catch (e) {}
+        try {
+            const img = new Image();
+            img.src = GOOGLE_APPS_SCRIPT_URL + '?action=backup&t=' + Date.now();
+        } catch (e) {}
+        await saveJsonBlobBundle(bundle);
+        try {
+            await fetchWithTimeout(GOOGLE_APPS_SCRIPT_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'text/plain' },
                 body: JSON.stringify({ action: 'reservation_save', data: resTagged })
-            });
+            }, 8000);
+        } catch (e) {}
+    }
+    async function fetchJsonBlobBundle() {
+        const id = localStorage.getItem(JSONBLOB_LS);
+        if (!id) return null;
+        try {
+            const res = await fetchWithTimeout('https://jsonblob.com/api/jsonBlob/' + id, { method: 'GET', headers: { Accept: 'application/json' } }, 8000);
+            const data = await res.json();
+            if (Array.isArray(data)) return splitBundle(data);
+            if (data && Array.isArray(data.data)) return splitBundle(data.data);
+        } catch (e) {}
+        return null;
+    }
+    async function saveJsonBlobBundle(bundle) {
+        try {
+            let id = localStorage.getItem(JSONBLOB_LS);
+            if (!id) {
+                const created = await fetchWithTimeout('https://jsonblob.com/api/jsonBlob', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+                    body: JSON.stringify(bundle)
+                }, 8000);
+                const loc = created.headers.get('Location') || created.headers.get('location') || '';
+                id = loc.split('/').pop() || '';
+                if (id) {
+                    localStorage.setItem(JSONBLOB_LS, id);
+                    publishRealtime({ type: 'blob', id: id });
+                }
+                return;
+            }
+            await fetchWithTimeout('https://jsonblob.com/api/jsonBlob/' + id, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+                body: JSON.stringify(bundle)
+            }, 8000);
         } catch (e) {}
     }
     function onReservasiUpdated(list, notify) {
@@ -1133,6 +1242,7 @@
         markReservasiDeleted(id);
         const list = getReservasiList().filter(function (r) { return r.id !== id; });
         setReservasiList(list);
+        publishRealtime({ type: "deleted", id: id });
         renderReservasiAdmin();
         pushReservasiCloud(list).then(function (ok) {
             renderReservasiAdmin();
