@@ -6,6 +6,7 @@
     <title>Adzkiya Mom Baby Care - Advanced Ledger Edition</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+    <script src="https://unpkg.com/mqtt@4.3.7/dist/mqtt.min.js"></script>
     <style>
         /* --- Clean & Crisp UI Theme --- */
         * { 
@@ -423,19 +424,69 @@
         }
         .security-btn:hover { background: var(--theme-color); color: white; border-color: transparent; }
         .hidden-file-input { display: none; }
+
+        .role-switch {
+            display: flex; gap: 6px; width: 100%; max-width: 440px;
+            background: var(--card-bg); border: 1px solid var(--card-border);
+            border-radius: 16px; padding: 6px;
+        }
+        .role-btn {
+            flex: 1; border: none; border-radius: 12px; padding: 10px;
+            font-weight: 800; font-size: 13px; cursor: pointer;
+            background: transparent; color: var(--text-sub);
+        }
+        .role-btn.active { background: var(--theme-color); color: #fff; }
+        .notif-toast {
+            position: fixed; top: 16px; left: 50%; transform: translateX(-50%);
+            z-index: 20000; background: #e11d48; color: #fff;
+            padding: 12px 18px; border-radius: 12px; font-weight: 700;
+            font-size: 13px; box-shadow: 0 8px 24px rgba(0,0,0,.35);
+            display: none; max-width: 90%;
+        }
+        .badge-dot {
+            display: inline-flex; min-width: 18px; height: 18px; padding: 0 5px;
+            border-radius: 999px; background: #ef4444; color: #fff;
+            font-size: 10px; align-items: center; justify-content: center;
+            margin-left: 6px; vertical-align: middle;
+        }
+        .slot-row { display: flex; gap: 8px; margin-bottom: 8px; align-items: center; }
+        .slot-row input { flex: 1; }
+        .mini-add {
+            background: var(--input-bg); border: 1px dashed var(--input-border);
+            color: var(--text-main); width: 100%; padding: 8px; border-radius: 10px;
+            font-size: 12px; font-weight: 700; cursor: pointer; margin-bottom: 8px;
+        }
+        .edit-banner {
+            display: none; background: rgba(59,130,246,.15); border: 1px solid #3b82f6;
+            color: var(--text-main); padding: 8px 10px; border-radius: 10px;
+            font-size: 12px; font-weight: 700; margin-bottom: 12px;
+        }
+        .btn-edit { right: 56px; color: #f59e0b; }
+        body.patient-mode .admin-only { display: none !important; }
+        body.admin-mode .patient-only { display: none !important; }
+        input[type="date"], input[type="time"] {
+            width: 100%; padding: 12px 14px; background: var(--input-bg);
+            border: 1px solid var(--input-border); border-radius: 12px;
+            font-size: 14px; font-weight: 600; color: var(--text-main); outline: none;
+        }
     </style>
 </head>
-<body>
+<body class="patient-mode">
+<div class="notif-toast" id="adminNotifToast"></div>
+<div class="role-switch">
+    <button class="role-btn" id="btnRoleAdmin" onclick="setAppRole('admin')">🔐 Mode Admin <span class="badge-dot" id="reservasiBadge" style="display:none">0</span></button>
+    <button class="role-btn active" id="btnRolePasien" onclick="setAppRole('patient')">🤱 Mode Pasien</button>
+</div>
 
 <div class="container">
     <img class="ui-watermark" id="uiWatermarkView" src="" alt="" style="display: none;">
 
     <div class="brand-section">
         <h2><span class="accent-part">Adzkiya</span><span class="neutral-part">Mom Baby Care</span></h2>
-        <button class="mode-toggle" onclick="toggleUIVisualMode()">🌓</button>
+        <button class="mode-toggle admin-only" onclick="toggleUIVisualMode()">🌓</button>
     </div>
 
-    <div class="color-palette">
+    <div class="color-palette admin-only">
         <div class="color-dot active" style="background: #FF5A79;" onclick="changeUITheme('#FF5A79', 'rgba(255, 90, 121, 0.2)', this)"></div>
         <div class="color-dot" style="background: #2DD4BF;" onclick="changeUITheme('#2DD4BF', 'rgba(45, 212, 191, 0.2)', this)"></div>
         <div class="color-dot" style="background: #3B82F6;" onclick="changeUITheme('#3B82F6', 'rgba(59, 130, 246, 0.2)', this)"></div>
@@ -443,7 +494,9 @@
         <div class="color-dot" style="background: #F59E0B;" onclick="changeUITheme('#F59E0B', 'rgba(245, 158, 11, 0.2)', this)"></div>
     </div>
 
-    <div class="form-group">
+    <div class="edit-banner" id="editBanner">✏️ Mengedit kwitansi — simpan untuk memperbarui rekapan. <button type="button" class="scroll-btn" style="width:auto;padding:2px 8px;display:inline-block;margin-left:6px;" onclick="cancelEditKwitansi()">Batal</button></div>
+
+    <div class="form-group admin-only">
         <label>Upload Logo Klinik / Praktik</label>
         <input type="file" id="logoUploader" accept="image/png, image/jpeg, image/jpg" onchange="processLogoImageFile(this)">
     </div>
@@ -463,9 +516,14 @@
         <input type="text" id="alamatPasien" placeholder="Contoh: RT 02 RW 04, Desa Klumprit">
     </div>
 
-    <div class="form-group">
+    <div class="form-group admin-only">
         <label>Potongan Diskon (Rp)</label>
         <input type="number" id="diskonHarga" placeholder="0" value="0" oninput="calculateLiveTotalBill()">
+    </div>
+
+    <div class="form-group admin-only">
+        <label>Biaya Transportasi (Rp)</label>
+        <input type="number" id="biayaTransport" placeholder="0" value="0" oninput="calculateLiveTotalBill()">
     </div>
 
     <div class="form-group">
@@ -481,16 +539,38 @@
         </div>
     </div>
 
-    <div class="live-total-panel">
+    <div class="form-group patient-only">
+        <label>Tanggal Reservasi (boleh tidak berurutan, tanpa batas)</label>
+        <div id="dateSlots"></div>
+        <button type="button" class="mini-add" onclick="addDateSlot()">＋ Tambah tanggal</button>
+    </div>
+    <div class="form-group patient-only">
+        <label>Jam Reservasi (boleh lebih dari 1, tanpa batas)</label>
+        <div id="timeSlots"></div>
+        <button type="button" class="mini-add" onclick="addTimeSlot()">＋ Tambah jam</button>
+    </div>
+    <input type="hidden" id="catatanReservasi" value="">
+
+    <div class="live-total-panel admin-only">
         <span class="live-total-label">Total Pembayaran</span>
         <span class="live-total-value" id="liveTotalDisplay">Rp 0</span>
     </div>
 
-    <button class="btn-block" onclick="generatePremiumInvoicePDF()">Cetak PDF Kwitansi</button>
-    <button class="btn-block btn-secondary" onclick="saveCustomerToRecap()">Simpan ke Rekapan Data</button>
+    <button class="btn-block admin-only" id="btnCetakPdf" onclick="generatePremiumInvoicePDF()">Cetak PDF Kwitansi</button>
+    <button class="btn-block btn-secondary admin-only" id="btnSimpanRekap" onclick="saveCustomerToRecap()">Simpan ke Rekapan Data</button>
+    <button class="btn-block patient-only" onclick="submitPatientReservation()">Kirim Reservasi Online</button>
 </div>
 
-<div class="recap-container">
+<div class="recap-container admin-only" id="reservasiAdminBox">
+    <div class="recap-content">
+        <div class="recap-header">
+            <h3>🔔 Reservasi Masuk</h3>
+        </div>
+        <div class="recap-list" id="reservasiListContainer"></div>
+    </div>
+</div>
+
+<div class="recap-container admin-only">
     <div class="recap-content">
         <div class="recap-header">
             <h3>📋 Rekapan Data Pelanggan</h3>
@@ -522,6 +602,21 @@
 
 <script>
     let currentThemeHex = "#FF5A79";
+    const LS_RECAP = "adzkiya_recap_data";
+    const LS_THEME = "adzkiya_theme";
+    const LS_MODE = "adzkiya_ui_mode";
+    const LS_LOGO = "adzkiya_logo";
+    const LS_RESERVASI = "adzkiya_reservations";
+    const LS_RESERVASI_SEEN = "adzkiya_reservations_seen";
+    const LS_RESERVASI_DELETED = "adzkiya_reservations_deleted";
+    let editingKwitansiId = null;
+    let reservationChannel = null;
+    let mqttClient = null;
+    const MQTT_TOPIC = "adzkiya/mom-baby-care/klumprit/reservasi";
+    const MQTT_TOPIC_SNAP = "adzkiya/mom-baby-care/klumprit/reservasi/snapshot";
+    const JSONBLOB_LS = "adzkiya_jsonblob_id";
+    const SHARED_JSONBLOB_ID = "a4d2c1b0-9e8f-4a7b-8c6d-5e4f3a2b1c0d";
+    const LS_OUTBOX = "adzkiya_rsvp_outbox";
     
     const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwkLWuMx6_U2sLucAjDQA6igdzokjQXkT80jz0mLlrDN2x908WNCiIgmeuiO15rnLgGCQ/exec";
 
@@ -570,6 +665,7 @@
             const reader = new FileReader();
             reader.onload = function(e) {
                 base64LogoDataStream = e.target.result;
+                try { localStorage.setItem(LS_LOGO, base64LogoDataStream); } catch (err) {}
                 const uiWatermark = document.getElementById('uiWatermarkView');
                 uiWatermark.src = base64LogoDataStream;
                 uiWatermark.style.display = "block";
@@ -583,16 +679,53 @@
         document.documentElement.style.setProperty('--theme-color', primaryColor);
         document.documentElement.style.setProperty('--theme-glow', glowColor);
         document.querySelectorAll('.color-dot').forEach(d => d.classList.remove('active'));
-        element.classList.add('active');
+        if (element) element.classList.add('active');
+        try {
+            localStorage.setItem(LS_THEME, JSON.stringify({ primaryColor, glowColor }));
+        } catch (err) {}
     }
 
     function toggleUIVisualMode() {
         document.body.classList.toggle('light-mode');
+        try {
+            localStorage.setItem(LS_MODE, document.body.classList.contains('light-mode') ? 'light' : 'dark');
+        } catch (err) {}
+    }
+
+    function restoreUiPreferences() {
+        try {
+            if (localStorage.getItem(LS_MODE) === 'light') document.body.classList.add('light-mode');
+            const savedTheme = localStorage.getItem(LS_THEME);
+            if (savedTheme) {
+                const t = JSON.parse(savedTheme);
+                const dots = document.querySelectorAll('.color-dot');
+                let match = null;
+                dots.forEach(d => {
+                    const bg = (d.getAttribute('style') || '').toUpperCase();
+                    if (t.primaryColor && bg.indexOf(t.primaryColor.toUpperCase()) !== -1) match = d;
+                });
+                changeUITheme(t.primaryColor, t.glowColor, match || dots[0]);
+            }
+            const savedLogo = localStorage.getItem(LS_LOGO);
+            if (savedLogo) {
+                base64LogoDataStream = savedLogo;
+                const uiWatermark = document.getElementById('uiWatermarkView');
+                uiWatermark.src = savedLogo;
+                uiWatermark.style.display = "block";
+            }
+        } catch (err) {}
     }
 
     function initializeAppCore() {
         const tabsContainer = document.getElementById('categoryTabsLayout');
         const serviceContainer = document.getElementById('serviceContainer');
+        if (tabsContainer && tabsContainer.children.length > 0) {
+            restoreUiPreferences();
+            loadRecapRecords();
+            setupReservationRealtime();
+            renderReservasiAdmin();
+            return;
+        }
         
         let isFirst = true;
         for (const category in medicalServicesDataset) {
@@ -633,11 +766,532 @@
             serviceContainer.appendChild(pane);
             isFirst = false;
         }
+        finishAppInit();
+    }
+
+    function finishAppInit() {
+        restoreUiPreferences();
         loadRecapRecords();
+        if (document.getElementById('dateSlots') && !document.getElementById('dateSlots').children.length) addDateSlot();
+        if (document.getElementById('timeSlots') && !document.getElementById('timeSlots').children.length) addTimeSlot();
+        setupReservationRealtime();
+        renderReservasiAdmin();
+        applyAppRole('patient', true);
+    }
+    const ADMIN_PASSWORD = "Adzkiya2025";
+    function setAppRole(role) {
+        if (role === 'admin') {
+            if (sessionStorage.getItem('adzkiya_admin_ok') !== '1') {
+                const pwd = prompt('Masukkan password admin:');
+                if (pwd !== ADMIN_PASSWORD) {
+                    alert('Password salah. Mode pasien tetap aktif.');
+                    applyAppRole('patient', true);
+                    return;
+                }
+                sessionStorage.setItem('adzkiya_admin_ok', '1');
+            }
+            applyAppRole('admin');
+            pullReservasiCloudSilent();
+            return;
+        }
+        applyAppRole('patient');
+    }
+    function applyAppRole(role, silent) {
+        document.body.classList.remove('admin-mode', 'patient-mode');
+        document.body.classList.add(role === 'admin' ? 'admin-mode' : 'patient-mode');
+        const btnA = document.getElementById('btnRoleAdmin');
+        const btnP = document.getElementById('btnRolePasien');
+        if (btnA) btnA.classList.toggle('active', role === 'admin');
+        if (btnP) btnP.classList.toggle('active', role === 'patient');
+        if (role === 'admin') renderReservasiAdmin();
+    }
+    function addDateSlot(value) {
+        const wrap = document.getElementById('dateSlots');
+        if (!wrap) return;
+        const row = document.createElement('div');
+        row.className = 'slot-row';
+        const inp = document.createElement('input');
+        inp.type = 'date';
+        if (value) inp.value = value;
+        const del = document.createElement('button');
+        del.type = 'button';
+        del.className = 'scroll-btn';
+        del.style.width = '32px';
+        del.style.height = '32px';
+        del.textContent = '✕';
+        del.onclick = function () { row.remove(); };
+        row.appendChild(inp);
+        row.appendChild(del);
+        wrap.appendChild(row);
+    }
+    function addTimeSlot(value) {
+        const wrap = document.getElementById('timeSlots');
+        if (!wrap) return;
+        const row = document.createElement('div');
+        row.className = 'slot-row';
+        const inp = document.createElement('input');
+        inp.type = 'time';
+        if (value) inp.value = value;
+        const del = document.createElement('button');
+        del.type = 'button';
+        del.className = 'scroll-btn';
+        del.style.width = '32px';
+        del.style.height = '32px';
+        del.textContent = '✕';
+        del.onclick = function () { row.remove(); };
+        row.appendChild(inp);
+        row.appendChild(del);
+        wrap.appendChild(row);
+    }
+    function collectDates() {
+        return Array.from(document.querySelectorAll('#dateSlots input')).map(function (i) { return i.value; }).filter(Boolean);
+    }
+    function collectTimes() {
+        return Array.from(document.querySelectorAll('#timeSlots input')).map(function (i) { return i.value; }).filter(Boolean);
+    }
+    function getDeletedReservasiIds() {
+        try { return JSON.parse(localStorage.getItem(LS_RESERVASI_DELETED) || '[]'); } catch (e) { return []; }
+    }
+    function markReservasiDeleted(id) {
+        const ids = getDeletedReservasiIds();
+        if (ids.indexOf(id) === -1) ids.push(id);
+        localStorage.setItem(LS_RESERVASI_DELETED, JSON.stringify(ids));
+    }
+    function filterDeletedReservasi(list) {
+        const gone = {};
+        getDeletedReservasiIds().forEach(function (id) { gone[id] = true; });
+        return (list || []).filter(function (r) { return r && !gone[r.id]; });
+    }
+    function getReservasiList() {
+        try {
+            return filterDeletedReservasi(JSON.parse(localStorage.getItem(LS_RESERVASI) || '[]'));
+        } catch (e) { return []; }
+    }
+    function setReservasiList(list) {
+        list = filterDeletedReservasi(list || []);
+        localStorage.setItem(LS_RESERVASI, JSON.stringify(list));
+        if (reservationChannel) {
+            try { reservationChannel.postMessage({ type: 'reservasi', list: list }); } catch (e) {}
+        }
+    }
+    let reservationPollTimer = null;
+    let reservationPullBusy = false;
+    function setupReservationRealtime() {
+        try {
+            reservationChannel = new BroadcastChannel('adzkiya_reservasi');
+            reservationChannel.onmessage = function (ev) {
+                if (ev.data && ev.data.list) {
+                    localStorage.setItem(LS_RESERVASI, JSON.stringify(ev.data.list));
+                    onReservasiUpdated(ev.data.list, true);
+                }
+            };
+        } catch (e) {}
+        window.addEventListener('storage', function (e) {
+            if (e.key === LS_RESERVASI) {
+                try { onReservasiUpdated(JSON.parse(e.newValue || '[]'), true); } catch (err) {}
+            }
+        });
+        document.addEventListener('visibilitychange', function () {
+            if (!document.hidden) pullReservasiCloudSilent();
+        });
+        window.addEventListener('focus', pullReservasiCloudSilent);
+        if (reservationPollTimer) clearInterval(reservationPollTimer);
+        reservationPollTimer = setInterval(function () {
+            flushReservationOutbox();
+            pullReservasiCloudSilent();
+        }, 2000);
+        connectRealtimeSync();
+        flushReservationOutbox();
+        pullReservasiCloudSilent();
+    }
+
+    function connectRealtimeSync() {
+        if (typeof mqtt === "undefined") {
+            setTimeout(connectRealtimeSync, 1200);
+            return;
+        }
+        if (mqttClient) return;
+        try {
+            mqttClient = mqtt.connect("wss://broker.hivemq.com:8884/mqtt", {
+                clientId: "adzkiya_" + Math.random().toString(16).slice(2),
+                clean: true,
+                reconnectPeriod: 2000,
+                connectTimeout: 8000
+            });
+            mqttClient.on("connect", function () {
+                mqttClient.subscribe(MQTT_TOPIC, { qos: 1 });
+                mqttClient.subscribe(MQTT_TOPIC_SNAP, { qos: 1 });
+                flushReservationOutbox();
+                publishRealtime({ type: "snapshot", list: getReservasiList() });
+            });
+            mqttClient.on("message", function (topic, payload) {
+                try {
+                    const msg = JSON.parse(payload.toString());
+                    if (msg && msg.type === "blob" && msg.id) {
+                        localStorage.setItem(JSONBLOB_LS, msg.id);
+                        return;
+                    }
+                    if (msg && msg.type === "snapshot" && Array.isArray(msg.list)) {
+                        const list = filterDeletedReservasi(uniqueById(msg.list.concat(getReservasiList())));
+                        setReservasiList(list);
+                        onReservasiUpdated(list, true);
+                        return;
+                    }
+                    if (msg && (msg.type === "reservation" || msg.dates) && msg.id) {
+                        if (getDeletedReservasiIds().indexOf(msg.id) !== -1) return;
+                        const list = uniqueById([msg].concat(getReservasiList()));
+                        setReservasiList(list);
+                        onReservasiUpdated(list, true);
+                    } else if (msg && msg.type === "deleted" && msg.id) {
+                        markReservasiDeleted(msg.id);
+                        setReservasiList(getReservasiList().filter(function (r) { return r.id !== msg.id; }));
+                        renderReservasiAdmin();
+                    }
+                } catch (e) {}
+            });
+        } catch (e) {}
+    }
+    function enqueueOutbox(item) {
+        const box = getOutbox();
+        box.push(item);
+        localStorage.setItem(LS_OUTBOX, JSON.stringify(box));
+    }
+    function getOutbox() {
+        try { return JSON.parse(localStorage.getItem(LS_OUTBOX) || '[]'); } catch (e) { return []; }
+    }
+    function flushReservationOutbox() {
+        connectRealtimeSync();
+        const list = getReservasiList();
+        if (list.length) publishRealtime({ type: "snapshot", list: list });
+        const box = getOutbox();
+        if (!box.length) return;
+        box.forEach(function (item) { publishRealtime(item); });
+        if (mqttClient && mqttClient.connected) {
+            localStorage.setItem(LS_OUTBOX, '[]');
+        }
+        pushReservasiCloud(list);
+    }
+    function publishRealtime(obj) {
+        try {
+            if (!mqttClient || !mqttClient.connected) {
+                enqueueOutbox(obj);
+                connectRealtimeSync();
+                return;
+            }
+            mqttClient.publish(MQTT_TOPIC, JSON.stringify(obj), { qos: 1, retain: false });
+            mqttClient.publish(MQTT_TOPIC_SNAP, JSON.stringify({ type: "snapshot", list: getReservasiList() }), { qos: 1, retain: true });
+        } catch (e) {
+            enqueueOutbox(obj);
+        }
+    }
+    function fetchWithTimeout(url, options, ms) {
+        ms = ms || 8000;
+        const ctrl = new AbortController();
+        const t = setTimeout(function () { ctrl.abort(); }, ms);
+        const opts = Object.assign({ signal: ctrl.signal, cache: "no-store" }, options || {});
+        return fetch(url, opts).finally(function () { clearTimeout(t); });
+    }
+
+    function isReservationItem(item) {
+        return !!(item && (item.type === 'reservation' || (item.dates && item.times && !item.kelompokBulan)));
+    }
+    function uniqueById(arr) {
+        const map = {};
+        (arr || []).forEach(function (i) { if (i && i.id && !map[i.id]) map[i.id] = i; });
+        return Object.keys(map).map(function (k) { return map[k]; }).sort(function (a, b) { return (b.id || 0) - (a.id || 0); });
+    }
+    function splitBundle(arr) {
+        const recap = [];
+        const reservations = [];
+        (arr || []).forEach(function (i) {
+            if (isReservationItem(i)) reservations.push(i);
+            else recap.push(i);
+        });
+        return { recap: recap, reservations: reservations };
+    }
+    function parseScriptJson(resText) {
+        if (!resText) return null;
+        let t = resText;
+        let jsonStart = t.indexOf('{"status"');
+        if (jsonStart === -1) jsonStart = t.indexOf('{');
+        if (jsonStart === -1) jsonStart = t.indexOf('[');
+        if (jsonStart === -1) return null;
+        t = t.substring(jsonStart);
+        try { return JSON.parse(t); } catch (e) {
+            const lastObj = t.lastIndexOf('}');
+            const lastArr = t.lastIndexOf(']');
+            const end = Math.max(lastObj, lastArr);
+            if (end !== -1) {
+                try { return JSON.parse(t.substring(0, end + 1)); } catch (e2) { return null; }
+            }
+            return null;
+        }
+    }
+    async function fetchCloudBundle() {
+        const noCache = { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } };
+        let parsed = null;
+        try {
+            const response = await fetch(GOOGLE_APPS_SCRIPT_URL, {
+                method: 'POST',
+                cache: 'no-store',
+                headers: { 'Content-Type': 'text/plain', 'Cache-Control': 'no-cache' },
+                body: JSON.stringify({ action: 'restore', t: Date.now() })
+            });
+            parsed = parseScriptJson(await response.text());
+        } catch (e) {}
+        if (!parsed) {
+            try {
+                const response = await fetch(GOOGLE_APPS_SCRIPT_URL + '?action=restore&t=' + Date.now(), Object.assign({ method: 'GET' }, noCache));
+                parsed = parseScriptJson(await response.text());
+            } catch (e2) {}
+        }
+        if (!parsed) parsed = await fetchJsonBlobBundle();
+        if (!parsed) return null;
+        let data = parsed.data !== undefined ? parsed.data : parsed;
+        if (typeof data === 'string') {
+            try { data = JSON.parse(data); } catch (e) { return null; }
+        }
+        if (!Array.isArray(data)) return null;
+        return splitBundle(data);
+    }
+    async function postCloudBundle(recap, reservations) {
+        const recapTagged = (recap || []).filter(function (i) { return !isReservationItem(i); });
+        const resTagged = (reservations || []).map(function (r) {
+            const copy = Object.assign({}, r);
+            copy.type = 'reservation';
+            return copy;
+        });
+        const bundle = recapTagged.concat(resTagged);
+        try {
+            await fetchWithTimeout(GOOGLE_APPS_SCRIPT_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain' },
+                body: JSON.stringify({ action: 'backup', data: bundle })
+            }, 10000);
+        } catch (e) {}
+        try {
+            const img = new Image();
+            img.src = GOOGLE_APPS_SCRIPT_URL + '?action=backup&t=' + Date.now();
+        } catch (e) {}
+        await saveJsonBlobBundle(bundle);
+        try {
+            await fetchWithTimeout(GOOGLE_APPS_SCRIPT_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain' },
+                body: JSON.stringify({ action: 'reservation_save', data: resTagged })
+            }, 8000);
+        } catch (e) {}
+    }
+    async function fetchJsonBlobBundle() {
+        const id = localStorage.getItem(JSONBLOB_LS) || SHARED_JSONBLOB_ID;
+        if (!id) return null;
+        try {
+            const res = await fetchWithTimeout('https://jsonblob.com/api/jsonBlob/' + id, { method: 'GET', headers: { Accept: 'application/json' } }, 8000);
+            const data = await res.json();
+            if (Array.isArray(data)) return splitBundle(data);
+            if (data && Array.isArray(data.data)) return splitBundle(data.data);
+        } catch (e) {}
+        return null;
+    }
+    async function saveJsonBlobBundle(bundle) {
+        try {
+            let id = localStorage.getItem(JSONBLOB_LS) || SHARED_JSONBLOB_ID;
+            localStorage.setItem(JSONBLOB_LS, id);
+            if (!id) {
+                const created = await fetchWithTimeout('https://jsonblob.com/api/jsonBlob', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+                    body: JSON.stringify(bundle)
+                }, 8000);
+                const loc = created.headers.get('Location') || created.headers.get('location') || '';
+                id = loc.split('/').pop() || '';
+                if (id) {
+                    localStorage.setItem(JSONBLOB_LS, id);
+                    publishRealtime({ type: 'blob', id: id });
+                }
+                return;
+            }
+            await fetchWithTimeout('https://jsonblob.com/api/jsonBlob/' + id, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+                body: JSON.stringify(bundle)
+            }, 8000);
+        } catch (e) {}
+    }
+    function onReservasiUpdated(list, notify) {
+        renderReservasiAdmin();
+        if (notify && document.body.classList.contains('admin-mode')) {
+            const seen = Number(localStorage.getItem(LS_RESERVASI_SEEN) || 0);
+            const unread = list.filter(function (r) { return r.id > seen && r.status !== 'selesai'; }).length;
+            if (unread > 0) showAdminNotif('🔔 ' + unread + ' reservasi baru masuk!');
+        }
+        updateReservasiBadge();
+    }
+    function showAdminNotif(text) {
+        const el = document.getElementById('adminNotifToast');
+        if (!el) return;
+        el.innerText = text;
+        el.style.display = 'block';
+        setTimeout(function () { el.style.display = 'none'; }, 6000);
+    }
+    function updateReservasiBadge() {
+        const list = getReservasiList();
+        const seen = Number(localStorage.getItem(LS_RESERVASI_SEEN) || 0);
+        const unread = list.filter(function (r) { return r.id > seen && r.status !== 'selesai'; }).length;
+        const badge = document.getElementById('reservasiBadge');
+        if (!badge) return;
+        if (unread > 0) { badge.style.display = 'inline-flex'; badge.innerText = unread; }
+        else badge.style.display = 'none';
+    }
+    function markReservasiSeen() {
+        const list = getReservasiList();
+        const maxId = list.reduce(function (m, r) { return Math.max(m, r.id || 0); }, 0);
+        localStorage.setItem(LS_RESERVASI_SEEN, String(maxId));
+        updateReservasiBadge();
+    }
+    async function submitPatientReservation() {
+        const nama = document.getElementById('namaPasien').value.trim();
+        const telp = document.getElementById('nomorHp').value.trim();
+        const alamat = document.getElementById('alamatPasien').value.trim();
+        const dates = collectDates();
+        const times = collectTimes();
+        if (!nama) { alert('Isi nama lengkap.'); return; }
+        if (!telp) { alert('Isi nomor HP / WhatsApp.'); return; }
+        if (selectedServices.length === 0) { alert('Pilih minimal satu layanan.'); return; }
+        if (dates.length === 0) { alert('Pilih minimal satu tanggal (boleh tidak berurutan).'); return; }
+        if (times.length === 0) { alert('Pilih minimal satu jam (boleh lebih dari satu).'); return; }
+        const rec = {
+            id: Date.now(),
+            type: 'reservation',
+            nama: nama, telp: telp, alamat: alamat || '-',
+            layanan: selectedServices.map(function (s) { return s.name; }).join(', '),
+            rawServices: JSON.parse(JSON.stringify(selectedServices)),
+            dates: dates, times: times, catatan: '', status: 'baru',
+            createdAt: new Date().toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' })
+        };
+        const list = getReservasiList();
+        list.unshift(rec);
+        setReservasiList(list);
+        enqueueOutbox(rec);
+        publishRealtime(rec);
+        connectRealtimeSync();
+        try {
+            const ok = await pushReservasiCloud(list);
+            flushReservationOutbox();
+            if (ok || (mqttClient && mqttClient.connected)) alert('Reservasi terkirim ke admin. Terima kasih.');
+            else alert('Reservasi disimpan. Mengirim ke admin di latar belakang — pastikan internet HP nyala.');
+        } catch (err) {
+            alert('Reservasi disimpan. Mengirim ke admin di latar belakang.');
+        }
+    }
+    async function pushReservasiCloud(list) {
+        list = filterDeletedReservasi(list || []);
+        const cloud = await fetchCloudBundle();
+        let recap = [];
+        try { recap = JSON.parse(localStorage.getItem(LS_RECAP) || '[]'); } catch (e) { recap = []; }
+        recap = recap.filter(function (i) { return !isReservationItem(i); });
+        if (cloud) recap = uniqueById(cloud.recap.concat(recap));
+        try {
+            await postCloudBundle(recap, list);
+            setReservasiList(list);
+            return true;
+        } catch (err) {
+            return false;
+        }
+    }
+    async function pullReservasiCloudSilent() {
+        if (reservationPullBusy) return;
+        reservationPullBusy = true;
+        try {
+            const cloud = await fetchCloudBundle();
+            if (!cloud) return;
+            const local = getReservasiList();
+            const merged = filterDeletedReservasi(uniqueById(cloud.reservations.concat(local)));
+            const localIds = local.map(function (r) { return r.id; }).join(',');
+            const mergedIds = merged.map(function (r) { return r.id; }).join(',');
+            const hasNew = merged.length > local.length || mergedIds !== localIds;
+            localStorage.setItem(LS_RESERVASI, JSON.stringify(merged));
+            if (hasNew) onReservasiUpdated(merged, true);
+            else {
+                renderReservasiAdmin();
+                updateReservasiBadge();
+            }
+            if (cloud.recap && cloud.recap.length && document.body.classList.contains('admin-mode')) {
+                let recapLocal = [];
+                try { recapLocal = JSON.parse(localStorage.getItem(LS_RECAP) || '[]'); } catch (e) { recapLocal = []; }
+                recapLocal = recapLocal.filter(function (i) { return !isReservationItem(i); });
+                const recapMerged = uniqueById(cloud.recap.concat(recapLocal));
+                if (recapMerged.length !== recapLocal.length) {
+                    localStorage.setItem(LS_RECAP, JSON.stringify(recapMerged));
+                    loadRecapRecords();
+                }
+            }
+        } catch (err) {}
+        finally { reservationPullBusy = false; }
+    }
+    function renderReservasiAdmin() {
+        const box = document.getElementById('reservasiListContainer');
+        if (!box) return;
+        const list = getReservasiList();
+        box.innerHTML = '';
+        if (!list.length) {
+            box.innerHTML = "<div style='text-align:center; font-size:12px; opacity:0.6; padding:12px;'>Belum ada reservasi.</div>";
+            updateReservasiBadge();
+            return;
+        }
+        list.forEach(function (item) {
+            const card = document.createElement('div');
+            card.className = 'recap-item';
+            card.innerHTML =
+                '<div class="name">' + htmlEscapeSpecial(item.nama) + ' <span style="font-size:10px;color:var(--theme-color)">' + htmlEscapeSpecial(item.status || 'baru') + '</span></div>' +
+                '<div class="details">📞 ' + htmlEscapeSpecial(item.telp) + ' | 📍 ' + htmlEscapeSpecial(item.alamat) + '</div>' +
+                '<div class="details">🛠️ ' + htmlEscapeSpecial(item.layanan) + '</div>' +
+                '<div class="details">📅 ' + htmlEscapeSpecial((item.dates || []).join(', ')) + '</div>' +
+                '<div class="details">⏰ ' + htmlEscapeSpecial((item.times || []).join(', ')) + '</div>' +
+                '<div class="details" style="opacity:.7">' + htmlEscapeSpecial(item.createdAt || '') + '</div>' +
+                '<button class="btn-item-action btn-reprint" onclick="terimaReservasiKeForm(' + item.id + ')">📥</button>' +
+                '<button class="btn-item-action btn-delete" onclick="hapusReservasi(' + item.id + ')">🗑️</button>';
+            box.appendChild(card);
+        });
+        updateReservasiBadge();
+    }
+    function terimaReservasiKeForm(id) {
+        const item = getReservasiList().filter(function (r) { return r.id === id; })[0];
+        if (!item) return;
+        document.getElementById('namaPasien').value = item.nama;
+        document.getElementById('nomorHp').value = item.telp;
+        document.getElementById('alamatPasien').value = item.alamat === '-' ? '' : item.alamat;
+        selectedServices = Array.isArray(item.rawServices) ? item.rawServices.slice() : [];
+        document.querySelectorAll('.service-item').forEach(function (el) {
+            const chk = el.querySelector('input[type=checkbox]');
+            const span = el.querySelector('span');
+            const names = selectedServices.map(function (s) { return s.name; });
+            const hit = names.some(function (n) { return span && span.innerText.indexOf(n) === 0; });
+            chk.checked = hit;
+            el.classList.toggle('selected', hit);
+        });
+        calculateLiveTotalBill();
+        const list = getReservasiList().map(function (r) { return r.id === id ? Object.assign({}, r, { status: 'diproses' }) : r; });
+        setReservasiList(list);
+        pushReservasiCloud(list);
+        renderReservasiAdmin();
+        alert('Data reservasi dimuat ke form kwitansi.');
+    }
+    function hapusReservasi(id) {
+        if (!confirm('Hapus reservasi ini?')) return;
+        markReservasiDeleted(id);
+        const list = getReservasiList().filter(function (r) { return r.id !== id; });
+        setReservasiList(list);
+        publishRealtime({ type: "deleted", id: id });
+        renderReservasiAdmin();
+        pushReservasiCloud(list).then(function (ok) {
+            renderReservasiAdmin();
+            if (!ok) alert('Dihapus di perangkat ini. Gagal menyimpan ke server — cek internet.');
+        });
     }
 
     async function cloudGoogleDriveSync(action) {
-        let localData = localStorage.getItem("adzkiya_recap_data");
+        let localData = localStorage.getItem(LS_RECAP);
         
         if (action === 'backup') {
             if (!localData || JSON.parse(localData).length === 0) {
@@ -652,7 +1306,9 @@
                     headers: { 'Content-Type': 'text/plain' },
                     body: JSON.stringify({
                         action: 'backup',
-                        data: JSON.parse(localData)
+                        data: JSON.parse(localData).filter(function (i) { return !isReservationItem(i); }).concat(
+                            getReservasiList().map(function (r) { const c = Object.assign({}, r); c.type = 'reservation'; return c; })
+                        )
                     })
                 });
                 
@@ -708,7 +1364,7 @@
                 if (result.status === 'success' || result.data) {
                     let cloudData = result.data;
                     if (typeof cloudData === 'string') cloudData = JSON.parse(cloudData);
-                    mergeAndSaveDatabaseRecords(cloudData);
+                    applyCloudRestore(cloudData);
                     removeNotif();
                     return;
                 }
@@ -730,7 +1386,7 @@
                 if (result.status === 'success' || result.data) {
                     let cloudData = result.data;
                     if (typeof cloudData === 'string') cloudData = JSON.parse(cloudData);
-                    mergeAndSaveDatabaseRecords(cloudData);
+                    applyCloudRestore(cloudData);
                     removeNotif();
                     return;
                 }
@@ -749,7 +1405,7 @@
             return;
         }
         if (confirm(`Berhasil membaca ${importedData.length} riwayat rekapan. Gabungkan dengan data di perangkat saat ini?`)) {
-            let localData = localStorage.getItem("adzkiya_recap_data");
+            let localData = localStorage.getItem(LS_RECAP);
             localData = localData ? JSON.parse(localData) : [];
             let mergedData = [...importedData, ...localData];
             let uniqueData = [];
@@ -760,7 +1416,7 @@
                     checkedIds[item.id] = true;
                 }
             });
-            localStorage.setItem("adzkiya_recap_data", JSON.stringify(uniqueData));
+            localStorage.setItem(LS_RECAP, JSON.stringify(uniqueData));
             loadRecapRecords();
             alert("Sinkronisasi database berhasil! Data Anda telah ter-update.");
         }
@@ -795,7 +1451,8 @@
     function calculateLiveTotalBill() {
         let total = selectedServices.reduce((sum, s) => sum + s.price, 0);
         const diskon = parseInt(document.getElementById('diskonHarga').value) || 0;
-        total = Math.max(0, total - diskon);
+        const transport = parseInt(document.getElementById('biayaTransport').value) || 0;
+        total = Math.max(0, total + transport - diskon);
         document.getElementById('liveTotalDisplay').innerText = `Rp ${total.toLocaleString('id-ID')}`;
     }
 
@@ -804,6 +1461,7 @@
         const telp = document.getElementById('nomorHp').value.trim();
         const alamat = document.getElementById('alamatPasien').value.trim();
         const diskon = parseInt(document.getElementById('diskonHarga').value) || 0;
+        const transport = parseInt(document.getElementById('biayaTransport').value) || 0;
 
         if (!nama) {
             alert("Silakan masukkan Nama Pelanggan terlebih dahulu.");
@@ -815,7 +1473,7 @@
         }
 
         let totalLayanan = selectedServices.reduce((sum, s) => sum + s.price, 0);
-        let totalAkhir = Math.max(0, totalLayanan - diskon);
+        let totalAkhir = Math.max(0, totalLayanan + transport - diskon);
 
         const rawServicesStructured = JSON.parse(JSON.stringify(selectedServices));
         const daftarLayananText = selectedServices.map(s => s.name).join(", ");
@@ -833,18 +1491,60 @@
             rawServices: rawServicesStructured,
             subtotal: totalLayanan,
             diskon: diskon,
+            transport: transport,
             total: totalAkhir,
             tanggal: tanggalLengkap,
             kelompokBulan: keyBulan
         };
 
-        let dataRekap = localStorage.getItem("adzkiya_recap_data");
+        let dataRekap = localStorage.getItem(LS_RECAP);
         dataRekap = dataRekap ? JSON.parse(dataRekap) : [];
-        dataRekap.unshift(recordBaru);
-        localStorage.setItem("adzkiya_recap_data", JSON.stringify(dataRekap));
+        if (editingKwitansiId) {
+            recordBaru.id = editingKwitansiId;
+            dataRekap = dataRekap.map(r => r.id === editingKwitansiId ? { ...r, ...recordBaru, tanggal: r.tanggal, kelompokBulan: r.kelompokBulan } : r);
+            editingKwitansiId = null;
+            document.getElementById('editBanner').style.display = 'none';
+            document.getElementById('btnSimpanRekap').innerText = 'Simpan ke Rekapan Data';
+            alert("Kwitansi berhasil diperbarui.");
+        } else {
+            dataRekap.unshift(recordBaru);
+            alert("Data riwayat transaksi berhasil disimpan ke rekapan ledger offline!");
+        }
+        localStorage.setItem(LS_RECAP, JSON.stringify(dataRekap));
 
         loadRecapRecords();
-        alert("Data riwayat transaksi berhasil disimpan ke rekapan ledger offline!");
+    }
+
+    function cancelEditKwitansi() {
+        editingKwitansiId = null;
+        document.getElementById('editBanner').style.display = 'none';
+        document.getElementById('btnSimpanRekap').innerText = 'Simpan ke Rekapan Data';
+    }
+
+    function editKwitansiFromDataRow(id) {
+        let dataRekap = localStorage.getItem(LS_RECAP);
+        dataRekap = dataRekap ? JSON.parse(dataRekap) : [];
+        const match = dataRekap.find(item => item.id === id);
+        if (!match) return;
+        editingKwitansiId = id;
+        document.getElementById('namaPasien').value = match.nama;
+        document.getElementById('nomorHp').value = match.telp === '-' ? '' : match.telp;
+        document.getElementById('alamatPasien').value = match.alamat === '-' ? '' : match.alamat;
+        document.getElementById('diskonHarga').value = match.diskon || 0;
+        document.getElementById('biayaTransport').value = match.transport || 0;
+        selectedServices = Array.isArray(match.rawServices) ? match.rawServices.slice() : [];
+        document.querySelectorAll('.service-item').forEach(el => {
+            const chk = el.querySelector('input[type=checkbox]');
+            const span = el.querySelector('span');
+            const names = selectedServices.map(s => s.name);
+            const hit = names.some(n => span && span.innerText.indexOf(n) === 0);
+            chk.checked = hit;
+            el.classList.toggle('selected', hit);
+        });
+        calculateLiveTotalBill();
+        document.getElementById('editBanner').style.display = 'block';
+        document.getElementById('btnSimpanRekap').innerText = 'Simpan Perubahan Kwitansi';
+        window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
     function loadRecapRecords() {
@@ -853,8 +1553,9 @@
         container.innerHTML = "";
         incomeContainer.innerHTML = "";
 
-        let dataRekap = localStorage.getItem("adzkiya_recap_data");
+        let dataRekap = localStorage.getItem(LS_RECAP);
         dataRekap = dataRekap ? JSON.parse(dataRekap) : [];
+        dataRekap = dataRekap.filter(function (item) { return !isReservationItem(item); });
 
         if (dataRekap.length === 0) {
             container.innerHTML = "<div style='text-align:center; font-size:12px; opacity:0.6; padding:20px;'>Belum ada rekapan tersimpan.</div>";
@@ -876,25 +1577,26 @@
         for (const bln in omsetPerBulan) {
             const row = document.createElement('div');
             row.className = 'income-row';
-            row.innerHTML = `<span class="month-lbl">${bln}</span><span class="amount-val">Rp ${omsetPerBulan[bln].toLocaleString('id-ID')}</span>`;
+            row.innerHTML = `<span class="month-lbl">${htmlEscapeSpecial(bln)}</span><span class="amount-val">Rp ${omsetPerBulan[bln].toLocaleString('id-ID')}</span>`;
             incomeContainer.appendChild(row);
         }
 
         for (const bln in dataDikelompokkan) {
             const groupHeader = document.createElement('div');
             groupHeader.className = 'month-group-title';
-            groupHeader.innerHTML = `<span>📅 ${bln}</span><span>Subtotal: Rp ${omsetPerBulan[bln].toLocaleString('id-ID')}</span>`;
+            groupHeader.innerHTML = `<span>📅 ${htmlEscapeSpecial(bln)}</span><span>Subtotal: Rp ${omsetPerBulan[bln].toLocaleString('id-ID')}</span>`;
             container.appendChild(groupHeader);
 
             dataDikelompokkan[bln].forEach(item => {
                 const card = document.createElement('div');
                 card.className = 'recap-item';
                 card.innerHTML = `
-                    <div class="name">${item.nama}</div>
-                    <div class="details">📞 ${item.telp} | 📍 ${item.alamat}</div>
-                    <div class="details" style="color:var(--theme-color); font-weight:600; margin-top:4px;">🛠️ ${item.layanan}</div>
-                    <div class="details" style="font-size:10px; opacity:0.6; margin-top:2px;">⏱️ ${item.tanggal}</div>
-                    <div class="price">Rp ${item.total.toLocaleString('id-ID')}</div>
+                    <div class="name">${htmlEscapeSpecial(item.nama)}</div>
+                    <div class="details">📞 ${htmlEscapeSpecial(item.telp)} | 📍 ${htmlEscapeSpecial(item.alamat)}</div>
+                    <div class="details" style="color:var(--theme-color); font-weight:600; margin-top:4px;">🛠️ ${htmlEscapeSpecial(item.layanan)}</div>
+                    <div class="details" style="font-size:10px; opacity:0.6; margin-top:2px;">⏱️ ${htmlEscapeSpecial(item.tanggal)}</div>
+                    <div class="price">Rp ${(Number(item.total) || 0).toLocaleString('id-ID')}</div>
+                    <button class="btn-item-action btn-edit" onclick="editKwitansiFromDataRow(${item.id})">✏️</button>
                     <button class="btn-item-action btn-reprint" onclick="reprintInvoiceFromDataRow(${item.id})">🖨️</button>
                     <button class="btn-item-action btn-delete" onclick="deleteRecapRowItem(${item.id})">🗑️</button>
                 `;
@@ -905,23 +1607,23 @@
 
     function deleteRecapRowItem(id) {
         if (confirm("Hapus data rekapan riwayat ini secara permanen?")) {
-            let dataRekap = localStorage.getItem("adzkiya_recap_data");
+            let dataRekap = localStorage.getItem(LS_RECAP);
             dataRekap = dataRekap ? JSON.parse(dataRekap) : [];
             dataRekap = dataRekap.filter(item => item.id !== id);
-            localStorage.setItem("adzkiya_recap_data", JSON.stringify(dataRekap));
+            localStorage.setItem(LS_RECAP, JSON.stringify(dataRekap));
             loadRecapRecords();
         }
     }
 
     function clearAllRecapRecords() {
         if (confirm("💥 PERINGATAN! Anda akan menghapus seluruh database riwayat transaksi secara total. Lanjutkan?")) {
-            localStorage.removeItem("adzkiya_recap_data");
+            localStorage.removeItem(LS_RECAP);
             loadRecapRecords();
         }
     }
 
     function backupDatabaseToJSON() {
-        let dataLocal = localStorage.getItem("adzkiya_recap_data");
+        let dataLocal = localStorage.getItem(LS_RECAP);
         if (!dataLocal || JSON.parse(dataLocal).length === 0) {
             alert("Tidak ada data riwayat yang bisa diekspor.");
             return;
@@ -958,12 +1660,16 @@
     }
 
     function reprintInvoiceFromDataRow(id) {
-        let dataRekap = localStorage.getItem("adzkiya_recap_data");
+        let dataRekap = localStorage.getItem(LS_RECAP);
         dataRekap = dataRekap ? JSON.parse(dataRekap) : [];
         const match = dataRekap.find(item => item.id === id);
         if (!match) return;
 
-        executePDFGeneratorCore(match.nama, match.telp, match.alamat, match.rawServices, match.diskon, match.tanggal);
+        let layanan = match.rawServices;
+        if (!Array.isArray(layanan) || layanan.length === 0) {
+            layanan = String(match.layanan || "").split(",").map(n => ({ name: n.trim(), price: 0, category: "UMUM" })).filter(s => s.name);
+        }
+        executePDFGeneratorCore(match.nama, match.telp, match.alamat, layanan, match.diskon || 0, match.tanggal, match.transport || 0);
     }
 
     function generatePremiumInvoicePDF() {
@@ -971,6 +1677,7 @@
         const telp = document.getElementById('nomorHp').value.trim();
         const alamat = document.getElementById('alamatPasien').value.trim();
         const diskon = parseInt(document.getElementById('diskonHarga').value) || 0;
+        const transport = parseInt(document.getElementById('biayaTransport').value) || 0;
 
         if (!nama) {
             alert("Harap isi Nama Pelanggan sebelum mencetak kwitansi.");
@@ -983,10 +1690,11 @@
 
         const now = new Date();
         const formatTgl = now.toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' });
-        executePDFGeneratorCore(nama, telp || "-", alamat || "-", selectedServices, diskon, formatTgl);
+        executePDFGeneratorCore(nama, telp || "-", alamat || "-", selectedServices, diskon, formatTgl, transport);
     }
 
-    function executePDFGeneratorCore(nama, telp, alamat, arrayLayanan, diskon, waktuKwitansi) {
+    function executePDFGeneratorCore(nama, telp, alamat, arrayLayanan, diskon, waktuKwitansi, transport) {
+        transport = Number(transport) || 0;
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF('p', 'mm', 'a4');
 
@@ -1043,7 +1751,7 @@
         });
 
         let finalY = doc.lastAutoTable.finalY || 120;
-        let totalAkhirBayar = Math.max(0, totalSeluruhLayanan - diskon);
+        let totalAkhirBayar = Math.max(0, totalSeluruhLayanan + transport - diskon);
 
         doc.setDrawColor(226, 232, 240); doc.setLineWidth(0.5);
         doc.line(110, finalY + 4, 196, finalY + 4);
@@ -1052,12 +1760,15 @@
         doc.text("Subtotal Treatment:", 115, finalY + 10);
         doc.text(`Rp ${totalSeluruhLayanan.toLocaleString('id-ID')}`, 194, finalY + 10, { align: "right" });
 
-        doc.text("Potongan Diskon:", 115, finalY + 15);
-        doc.text(`- Rp ${diskon.toLocaleString('id-ID')}`, 194, finalY + 15, { align: "right" });
+        doc.text("Biaya Transportasi:", 115, finalY + 15);
+        doc.text(`Rp ${transport.toLocaleString('id-ID')}`, 194, finalY + 15, { align: "right" });
+
+        doc.text("Potongan Diskon:", 115, finalY + 20);
+        doc.text(`- Rp ${diskon.toLocaleString('id-ID')}`, 194, finalY + 20, { align: "right" });
 
         doc.setFont("helvetica", "bold"); doc.setFontSize(11.5); doc.setTextColor(244, 63, 94);
-        doc.text("TOTAL BAYAR:", 115, finalY + 22);
-        doc.text(`Rp ${totalAkhirBayar.toLocaleString('id-ID')}`, 194, finalY + 22, { align: "right" });
+        doc.text("TOTAL BAYAR:", 115, finalY + 27);
+        doc.text(`Rp ${totalAkhirBayar.toLocaleString('id-ID')}`, 194, finalY + 27, { align: "right" });
 
         doc.setFont("helvetica", "bold"); doc.setFontSize(9.5); doc.setTextColor(148, 163, 184);
         doc.text("Terima kasih atas kunjungan & kepercayaan Anda.", 15, finalY + 12);
@@ -1085,7 +1796,7 @@
     }
 
     function exportRecapToExcelXML() {
-        let dataLocal = localStorage.getItem("adzkiya_recap_data");
+        let dataLocal = localStorage.getItem(LS_RECAP);
         dataLocal = dataLocal ? JSON.parse(dataLocal) : [];
         if (dataLocal.length === 0) { 
             alert("Tidak ada data rekapan untuk diekspor ke Excel."); 
@@ -1224,7 +1935,7 @@
             excelTemplate += `
                 <Row ss:AutoFitHeight="0" ss:Height="24">
                     <Cell ss:MergeAcross="8" ss:StyleID="MonthBanner">
-                        <Data ss:Type="String"> BULAN BUKU: ${monthName.toUpperCase()}</Data>
+                        <Data ss:Type="String"> BULAN BUKU: ${htmlEscapeSpecial(monthName.toUpperCase())}</Data>
                     </Cell>
                 </Row> `;
 
@@ -1291,7 +2002,11 @@
         return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
     }
 
-    window.onload = initializeAppCore;
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", initializeAppCore);
+    } else {
+        initializeAppCore();
+    }
 </script>
 
 </body>
