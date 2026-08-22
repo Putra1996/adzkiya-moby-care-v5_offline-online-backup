@@ -1,24 +1,34 @@
 # Adzkiya Mom Baby Care — Ledger Edition
 
-Aplikasi kwitansi & rekapan offline/online (HTML statis). Siap di-deploy ke **Netlify**.
+Aplikasi kwitansi, rekapan, dan reservasi (HTML statis). **Bisa di-host di GitHub Pages** (tanpa Netlify).
 
-## Fitur (semua dipertahankan)
+## Deploy di GitHub Pages (disarankan)
 
-- Form pasien, diskon, kategori layanan IBU / BAYI / ANAK / MOM AND NEW BORN
-- Tema warna & mode gelap/terang
-- Upload logo klinik (watermark)
-- Total live, cetak PDF kwitansi (jsPDF)
-- Simpan rekapan ke `localStorage`, hapus per item / semua
-- Cetak ulang kwitansi dari rekapan
-- Export Excel (XML Spreadsheet)
-- Backup / restore JSON offline
-- Backup / restore Google Drive (Google Apps Script)
+### Cara A — dari pengaturan repo (paling sederhana)
 
-## Deploy Netlify
+1. Buka repo di GitHub: `Putra1996/adzkiya-moby-care-v5_offline-online-backup`
+2. **Settings → Pages**
+3. **Source:** Deploy from a branch
+4. **Branch:** `arena/01a0208b-adzkiya-moby-care-v5-offline-o`
+5. **Folder:** `/ (root)`
+6. Save. Tunggu 1–2 menit.
+7. URL: `https://putra1996.github.io/adzkiya-moby-care-v5_offline-online-backup/`
 
-1. Push repositori ini ke GitHub.
-2. Di [Netlify](https://app.netlify.com): **Add new site → Import an existing project**.
-3. Build command: kosong / `echo skip`. Publish directory: `.` (root).
-4. Atau drag-and-drop folder ini ke [Netlify Drop](https://app.netlify.com/drop).
+### Cara B — GitHub Actions (otomatis tiap push)
 
-Tidak ada Node build. File utama: `index.html`.
+1. **Settings → Pages → Source:** GitHub Actions
+2. Push ke branch di atas. Workflow `Deploy GitHub Pages` akan jalan.
+3. Buka tab **Actions** jika ingin melihat status deploy.
+
+File `.nojekyll` sudah ada agar GitHub tidak memblokir file statis.
+
+## Fitur
+
+- Mode pasien (reservasi tanggal/jam tanpa batas) & mode admin (password `Adzkiya2025`)
+- Edit kwitansi, biaya transport, cetak PDF, rekapan, Excel
+- Backup / restore JSON & Google Drive
+- Terima / hapus reservasi
+
+## Deploy Netlify (opsional)
+
+Jika kuota Netlify masih ada: publish directory `.` tanpa build, atau drag folder berisi `index.html`.
