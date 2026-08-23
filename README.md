@@ -2,25 +2,22 @@
 
 Aplikasi kwitansi, rekapan, dan reservasi (HTML statis). **Bisa di-host di GitHub Pages** (tanpa Netlify).
 
-## Deploy di GitHub Pages (disarankan)
+## Deploy di GitHub Pages (aktif)
 
-### Cara A — dari pengaturan repo (paling sederhana)
+Pages sudah diatur **Source: Deploy from a branch → `main` → `/ (root)`**, jadi setiap push/merge ke `main` langsung ter-deploy otomatis (tanpa workflow tambahan).
 
-1. Buka repo di GitHub: `Putra1996/adzkiya-moby-care-v5_offline-online-backup`
-2. **Settings → Pages**
-3. **Source:** Deploy from a branch
-4. **Branch:** `arena/01a0208b-adzkiya-moby-care-v5-offline-o`
-5. **Folder:** `/ (root)`
-6. Save. Tunggu 1–2 menit.
-7. URL: `https://putra1996.github.io/adzkiya-moby-care-v5_offline-online-backup/`
+- **URL live:** `https://putra1996.github.io/adzkiya-moby-care-v5_offline-online-backup/`
+- File `.nojekyll` sudah ada agar file statis tidak diproses Jekyll.
 
-### Cara B — GitHub Actions (otomatis tiap push)
+### Cara deploy
 
-1. **Settings → Pages → Source:** GitHub Actions
-2. Push ke branch di atas. Workflow `Deploy GitHub Pages` akan jalan.
-3. Buka tab **Actions** jika ingin melihat status deploy.
+1. Push perubahan ke `main` (atau merge PR ke `main`).
+2. Tunggu 1–2 menit. Pantau status di tab **Actions → "Pages build and deployment"**.
+3. Buka URL live (pakai hard refresh Ctrl/Cmd+Shift+R kalau masih dapat versi lama).
 
-File `.nojekyll` sudah ada agar GitHub tidak memblokir file statis.
+### Jika ingin deploy dari branch lain
+
+**Settings → Pages → Source:** Deploy from a branch → pilih branch + **Folder:** `/ (root)` → Save.
 
 ## Fitur
 
