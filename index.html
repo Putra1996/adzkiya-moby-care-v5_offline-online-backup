@@ -1296,6 +1296,34 @@
         });
     }
 
+    function applyCloudRestore(cloudData) {
+        if (!Array.isArray(cloudData)) {
+            alert("⚠️ Struktur data dari Google Drive tidak valid. Data lokal tidak berubah.");
+            return;
+        }
+        const bundle = splitBundle(cloudData);
+        const totalRekapCloud = bundle.recap.length;
+        const totalReservasiCloud = bundle.reservations.length;
+
+        // Gabungkan rekapan: data cloud + data lokal (dedup berdasarkan id, versi cloud menang)
+        let recapLocal = [];
+        try { recapLocal = JSON.parse(localStorage.getItem(LS_RECAP) || '[]'); } catch (e) { recapLocal = []; }
+        recapLocal = recapLocal.filter(function (i) { return !isReservationItem(i); });
+        const recapMerged = uniqueById(bundle.recap.concat(recapLocal));
+        localStorage.setItem(LS_RECAP, JSON.stringify(recapMerged));
+
+        // Gabungkan reservasi: data cloud + data lokal (dedup berdasarkan id, hormati yang sudah dihapus)
+        const resMerged = filterDeletedReservasi(uniqueById(bundle.reservations.concat(getReservasiList())));
+        setReservasiList(resMerged);
+
+        loadRecapRecords();
+        renderReservasiAdmin();
+
+        alert("✅ Restore online berhasil!\n\n" +
+            "Terbaca dari cloud: " + totalRekapCloud + " rekapan & " + totalReservasiCloud + " reservasi.\n" +
+            "Total setelah digabung dengan data lokal: " + recapMerged.length + " rekapan & " + resMerged.length + " reservasi.");
+    }
+
     async function cloudGoogleDriveSync(action) {
         let localData = localStorage.getItem(LS_RECAP);
         
@@ -1347,6 +1375,8 @@
 
             const removeNotif = () => { if(statusNotif && statusNotif.parentNode) statusNotif.parentNode.removeChild(statusNotif); };
 
+            let lastError = "";
+
             try {
                 let response = await fetch(GOOGLE_APPS_SCRIPT_URL, {
                     method: 'POST',
@@ -1355,53 +1385,57 @@
                 });
                 
                 let resText = await response.text();
-                
-                // Cari JSON terlepas dari format html redirect
-                let jsonStart = resText.indexOf('{"status"');
-                if (jsonStart !== -1) {
-                    resText = resText.substring(jsonStart);
-                    let jsonEnd = resText.lastIndexOf('}');
-                    if (jsonEnd !== -1) {
-                        resText = resText.substring(0, jsonEnd + 1);
-                    }
-                }
-
-                let result = JSON.parse(resText);
-                if (result.status === 'success' || result.data) {
+                let result = parseScriptJson(resText);
+                if (result && (result.status === 'success' || result.data)) {
                     let cloudData = result.data;
                     if (typeof cloudData === 'string') cloudData = JSON.parse(cloudData);
                     applyCloudRestore(cloudData);
                     removeNotif();
                     return;
                 }
+                lastError = (result && result.message) ? result.message : "Respons server tidak valid.";
             } catch (err) {
                 console.warn("Metode POST terhambat, mencoba metode GET...", err);
+                lastError = String(err);
             }
 
             // Fallback GET
             try {
-                let response = await fetch(`${GOOGLE_APPS_SCRIPT_URL}?action=restore`, { method: 'GET' });
+                let response = await fetch(`${GOOGLE_APPS_SCRIPT_URL}?action=restore&t=${Date.now()}`, { method: 'GET', cache: 'no-store' });
                 let resText = await response.text();
-                let jsonStart = resText.indexOf('{"status"');
-                if (jsonStart !== -1) {
-                    resText = resText.substring(jsonStart);
-                    let jsonEnd = resText.lastIndexOf('}');
-                    if (jsonEnd !== -1) resText = resText.substring(0, jsonEnd + 1);
-                }
-                let result = JSON.parse(resText);
-                if (result.status === 'success' || result.data) {
+                let result = parseScriptJson(resText);
+                if (result && (result.status === 'success' || result.data)) {
                     let cloudData = result.data;
                     if (typeof cloudData === 'string') cloudData = JSON.parse(cloudData);
                     applyCloudRestore(cloudData);
                     removeNotif();
                     return;
                 }
+                lastError = (result && result.message) ? result.message : "Respons server tidak valid.";
             } catch (err) {
                 console.error("Metode GET juga terhambat:", err);
+                lastError = String(err);
+            }
+
+            // Fallback terakhir: backup di jsonblob (ditulis setiap kali Backup Drive berhasil)
+            try {
+                const cloudBlob = await fetchJsonBlobBundle();
+                if (cloudBlob) {
+                    applyCloudRestore(cloudBlob.recap.concat(cloudBlob.reservations));
+                    removeNotif();
+                    return;
+                }
+            } catch (err) {
+                console.error("Fallback jsonblob gagal:", err);
             }
 
             removeNotif();
-            alert("⚠️ Gagal memulihkan data.\n\nKemungkinan Besar Penyebabnya:\nAda kesalahan ketik pada script di Google Apps Script Anda (misal DriveAsApp seharusnya DriveApp) sehingga server Google crash.\n\nSilakan ganti script di Google Cloud Anda dengan script perbaikan terbaru yang saya berikan di bawah.");
+            alert("⚠️ Gagal memulihkan data dari Google Drive.\n\n" +
+                "Kemungkinan penyebab:\n" +
+                "1. Koneksi internet tidak stabil.\n" +
+                "2. Web App Google Apps Script belum di-deploy, terhapus, atau aksesnya bukan 'Anyone'.\n\n" +
+                "Detail: " + (lastError || "tidak ada respons dari server") +
+                "\n\nSilakan coba lagi, atau gunakan 'Backup Offline' lalu 'Restore Offline' lewat berkas JSON.");
         }
     }
 
